@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: enterprise-ai-api
+  namespace: enterprise-ai
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: enterprise-ai-api
+
+  template:
+    metadata:
+      labels:
+        app: enterprise-ai-api
+
+    spec:
+      containers:
+        - name: api
+
+          image: enterprise-ai-assistant-app:latest
+
+          imagePullPolicy: Never
+
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secret  

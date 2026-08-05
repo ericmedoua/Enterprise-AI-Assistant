@@ -1,0 +1,58 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.idea/
+.vscode/
+.pytest_cache/
+.coverage
+
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual Environment
+.venv/
+venv/
+env/
+
+# Environment Variables
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# Python caches
+.pytest_cache/
+.mypy_cache/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Chroma database
+chroma_db/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+.coverage
+htmlcov/
+
+# SQLite
+*.db
+
+# Ignore Kubernetes secrets containing real values
+k8s/secret.yamlk8s/secret.yaml
+
+k8s/secret.yaml

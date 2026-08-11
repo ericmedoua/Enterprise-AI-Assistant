@@ -1,4 +1,5 @@
 from app.ai.vectorstore.chroma_service import ChromaService
+from app.ai.retrieval.dependencies import get_chroma_service
 from app.schemas.debug import (
     RetrievalDebugResponse,
     RetrievalDebugResult,
@@ -6,17 +7,9 @@ from app.schemas.debug import (
 
 
 class RetrievalDebugService:
-    def __init__(self):
+    def search(self, query: str, k: int = 4):
 
-        self.vectorstore = ChromaService()
-
-    def search(
-        self,
-        query: str,
-        k: int = 4,
-    ) -> RetrievalDebugResponse:
-
-        results = self.vectorstore.similarity_search_with_score(
+        results = get_chroma_service().similarity_search_with_score(
             query=query,
             k=k,
         )

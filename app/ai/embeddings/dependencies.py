@@ -1,11 +1,8 @@
 from app.ai.cache.dependencies import get_embedding_cache
 from app.ai.embeddings.embedding_service import EmbeddingService
-
-_embedding_service = EmbeddingService(
-    get_embedding_cache(),
-)
+from functools import lru_cache
 
 
+@lru_cache
 def get_embedding_service():
-
-    return _embedding_service
+    return EmbeddingService(get_embedding_cache())

@@ -10,6 +10,8 @@ from app.auth.dependencies import get_current_user
 
 from app.models.user import User
 
+from functools import lru_cache
+
 from app.repositories.dependencies import (
     get_chat_repository,
 )
@@ -50,7 +52,10 @@ class ChatResponse(BaseModel):
     answer: str
 
 
-service = ChatbotService()
+
+@lru_cache
+def get_chatbot_service():
+    return ChatbotService()
 
 
 @router.post(
@@ -59,11 +64,12 @@ service = ChatbotService()
 )
 def ask(
     request: ChatRequest,
+    service: ChatbotService = Depends(get_chatbot_service),
 ):
-
     answer = service.ask(request.question)
 
     return ChatResponse(answer=answer)
+
 
 
 from app.ai.streaming.dependencies import (

@@ -16,3 +16,4 @@ data:
   DATABASE_NAME: "enterprise_ai_db"
   DATABASE_USER: "postgres"
   EMBEDDING_MODEL: "all-MiniLM-L6-v2"
+  LOG_LEVEL: INFO

@@ -21,8 +21,7 @@ UPLOAD_DIRECTORY = Path("storage")
 
 
 def _index_document_to_chroma(file_path: str):
-    documents = IndexingService().index_document(file_path)
-    get_chroma_service().add_documents(documents)
+    IndexingService().index_document(file_path)
 
 
 @router.post("/upload")

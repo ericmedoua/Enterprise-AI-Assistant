@@ -10,9 +10,10 @@ from app.documents.services.document_service import (
     DocumentService,
 )
 
-from app.ai.vectorstore.dependencies import (
-    get_vector_store,
-)
+# from app.ai.vectorstore.dependencies import get_vector_store
+
+from app.ai.retrieval.dependencies import get_chroma_service
+
 
 from langchain_core.documents import Document
 
@@ -39,7 +40,7 @@ def process_document(
             ]
         )
 
-    vector_store = get_vector_store()
+    vector_store = get_chroma_service()
 
     vector_store.add_documents(
         docs,

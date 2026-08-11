@@ -1,34 +1,69 @@
 apiVersion: apps/v1
 kind: Deployment
-
 metadata:
   name: enterprise-ai-api
   namespace: enterprise-ai
-
 spec:
   replicas: 1
-
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
-      app: enterprise-ai-api
-
+      app: enterprise-ai
   template:
     metadata:
       labels:
-        app: enterprise-ai-api
-
+        app: enterprise-ai
     spec:
       containers:
         - name: api
-
-          image: enterprise-ai-assistant-app:latest
-
+          image: enterprise-ai-assistant-app:v1
           imagePullPolicy: Never
-
           ports:
             - containerPort: 8000
           envFrom:
             - configMapRef:
                 name: app-config
             - secretRef:
-                name: app-secret  
+                name: app-secret
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "2Gi"
+      startupProbe:
+  httpGet:
+    path: /api/v1/health
+    port: 8000
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 60
+
+readinessProbe:
+  httpGet:
+    path: /api/v1/health
+    port: 8000
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+
+livenessProbe:
+  httpGet:
+    path: /api/v1/health
+    port: 8000
+  initialDelaySeconds: 10
+  periodSeconds: 15
+  timeoutSeconds: 5
+  failureThreshold: 5  
+  terminationMessagePath: /dev/termination-log
+  terminationMessagePolicy: File
+  restartPolicy: Always
+
+
+
+
+

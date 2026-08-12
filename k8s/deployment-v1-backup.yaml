@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: api
-          image: enterprise-ai-assistant-app:v2
+          image: enterprise-ai-assistant-app:v1
           imagePullPolicy: Never
           ports:
             - containerPort: 8000

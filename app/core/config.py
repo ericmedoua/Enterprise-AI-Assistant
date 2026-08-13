@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     APP_NAME: str
     API_VERSION: str
     DEBUG: bool
-
+    LOG_LEVEL: str = "INFO"
     HOST: str
     PORT: int
 

@@ -3,12 +3,10 @@ from langchain_core.messages import HumanMessage
 
 from app.ai.chains.rag_chain import build_rag_chain
 from app.ai.llm.dependencies import get_llm_dependency
-from app.ai.vectorstore.dependencies import get_vectorstore
+from app.ai.retrieval.dependencies import get_retriever
 
 
-vectorstore = get_vectorstore()
-
-retriever = vectorstore.as_retriever()
+retriever = get_retriever()
 
 llm = get_llm_dependency()
 

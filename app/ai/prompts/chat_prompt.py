@@ -1,9 +1,5 @@
 from langchain_core.prompts import ChatPromptTemplate
 
-from app.ai.prompts.system_prompt import (
-    ENTERPRISE_SYSTEM_PROMPT,
-)
-
 chat_prompt = ChatPromptTemplate.from_messages(
     [
         (
@@ -29,15 +25,20 @@ Rules:
 
 6. Quote important technical names exactly as written.
 
-7. At the end of every answer, include:
+7. At the end of every answer, include the retrieved sources exactly as provided.
 
 Sources:
-- source name
-- page number
+
+{sources}
 
 Context:
 
 {context}
+
+Retrieved Context Available:
+
+{has_context}
+
             """,
         ),
         (

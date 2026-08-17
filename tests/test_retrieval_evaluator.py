@@ -2,6 +2,7 @@ from langchain_core.documents import Document
 
 from app.ai.evaluation.retrieval_evaluator import (
     retrieval_hit,
+    retrieval_hit_rate,
 )
 
 
@@ -53,3 +54,18 @@ def test_retrieval_miss_when_no_documents_are_returned():
         )
         is False
     )
+
+
+def test_retrieval_hit_rate():
+    results = [
+        True,
+        True,
+        False,
+        True,
+    ]
+
+    assert retrieval_hit_rate(results) == 0.75
+
+
+def test_retrieval_hit_rate_with_no_results():
+    assert retrieval_hit_rate([]) == 0.0

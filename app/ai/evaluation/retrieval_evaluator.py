@@ -22,3 +22,14 @@ def retrieval_hit(
             return True
 
     return False
+
+
+def retrieval_hit_rate(results: list[bool]) -> float:
+    """
+    Calculate retrieval hit rate as a value between 0 and 1.
+    """
+
+    if not results:
+        return 0.0
+
+    return sum(results) / len(results)

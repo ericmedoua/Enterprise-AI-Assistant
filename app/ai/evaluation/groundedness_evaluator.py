@@ -1,4 +1,12 @@
 import re
+from dataclasses import dataclass
+
+
+@dataclass
+class GroundednessResult:
+    score: float
+    supported_sentences: int
+    total_sentences: int
 
 
 def _normalize_text(text: str) -> str:
@@ -23,22 +31,21 @@ def _normalize_text(text: str) -> str:
     return text.strip()
 
 
-def groundedness_score(
+def evaluate_groundedness(
     answer: str,
     context: str,
-) -> float:
+) -> GroundednessResult:
     """
-    Estimate how much of the answer is directly supported
+    Evaluate how much of the answer is directly supported
     by the retrieved context.
-
-    Returns a value between 0.0 and 1.0.
     """
 
-    if not answer.strip():
-        return 0.0
-
-    if not context.strip():
-        return 0.0
+    if not answer.strip() or not context.strip():
+        return GroundednessResult(
+            score=0.0,
+            supported_sentences=0,
+            total_sentences=0,
+        )
 
     normalized_context = _normalize_text(context)
 
@@ -52,7 +59,11 @@ def groundedness_score(
     ]
 
     if not sentences:
-        return 0.0
+        return GroundednessResult(
+            score=0.0,
+            supported_sentences=0,
+            total_sentences=0,
+        )
 
     supported = 0
 
@@ -62,4 +73,24 @@ def groundedness_score(
         if normalized_sentence in normalized_context:
             supported += 1
 
-    return supported / len(sentences)
+    total = len(sentences)
+
+    return GroundednessResult(
+        score=supported / total,
+        supported_sentences=supported,
+        total_sentences=total,
+    )
+
+
+def groundedness_score(
+    answer: str,
+    context: str,
+) -> float:
+    """
+    Backwards-compatible convenience function.
+    """
+
+    return evaluate_groundedness(
+        answer,
+        context,
+    ).score

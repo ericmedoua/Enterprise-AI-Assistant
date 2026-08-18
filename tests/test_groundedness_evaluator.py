@@ -1,4 +1,5 @@
 from app.ai.evaluation.groundedness_evaluator import (
+    evaluate_groundedness,
     groundedness_score,
 )
 
@@ -65,3 +66,14 @@ def test_empty_answer():
         )
         == 0.0
     )
+
+
+def test_groundedness_result_contains_sentence_counts():
+    result = evaluate_groundedness(
+        "Monkeys swing from trees. Monkeys live on Mars.",
+        "Monkeys swing from trees.",
+    )
+
+    assert result.score == 0.5
+    assert result.supported_sentences == 1
+    assert result.total_sentences == 2

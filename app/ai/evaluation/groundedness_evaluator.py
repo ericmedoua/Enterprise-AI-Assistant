@@ -94,3 +94,15 @@ def groundedness_score(
         answer,
         context,
     ).score
+
+
+def is_grounded(
+    result: GroundednessResult,
+    threshold: float = 1.0,
+) -> bool:
+    """
+    Return True when the groundedness score meets
+    or exceeds the configured threshold.
+    """
+
+    return result.score >= threshold

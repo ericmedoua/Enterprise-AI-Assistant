@@ -1,4 +1,13 @@
+from dataclasses import dataclass
+
 from langchain_core.documents import Document
+
+
+@dataclass
+class RetrievalEvaluationResult:
+    question: str
+    expected_source: str
+    hit: bool
 
 
 def retrieval_hit(

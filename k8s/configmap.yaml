@@ -16,4 +16,5 @@ data:
   DATABASE_NAME: "enterprise_ai_db"
   DATABASE_USER: "postgres"
   EMBEDDING_MODEL: "all-MiniLM-L6-v2"
+  GROQ_MODEL: "openai/gpt-oss-120b"
   LOG_LEVEL: INFO

@@ -142,3 +142,32 @@ def test_rag_evaluation_tracks_multiple_sources():
 
     assert result.source_count == 3
     assert result.overall_pass is True
+
+
+def test_rag_evaluation_summary():
+    groundedness = GroundednessResult(
+        score=1.0,
+        supported_sentences=2,
+        total_sentences=2,
+    )
+
+    semantic_relevance = SemanticRelevanceResult(
+        score=0.68,
+    )
+
+    result = evaluate_rag_response(
+        retrieval_hit=True,
+        groundedness=groundedness,
+        semantic_relevance=semantic_relevance,
+        source_count=2,
+    )
+
+    summary = result.summary()
+
+    assert summary == {
+        "retrieval_hit": True,
+        "groundedness_score": 1.0,
+        "semantic_relevance_score": 0.68,
+        "source_count": 2,
+        "overall_pass": True,
+    }

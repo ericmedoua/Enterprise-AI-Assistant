@@ -17,6 +17,19 @@ class RAGEvaluationResult:
     source_count: int
     overall_pass: bool
 
+    def summary(self) -> dict:
+        """
+        Return a compact, report-friendly representation
+        of the evaluation result.
+        """
+        return {
+        "retrieval_hit": self.retrieval_hit,
+        "groundedness_score": self.groundedness.score,
+        "semantic_relevance_score": (self.semantic_relevance.score),
+        "source_count": self.source_count,
+        "overall_pass": self.overall_pass,
+    }
+
 
 def evaluate_rag_response(
     retrieval_hit: bool,
@@ -44,3 +57,6 @@ def evaluate_rag_response(
         source_count=source_count,
         overall_pass=overall_pass,
     )
+
+
+

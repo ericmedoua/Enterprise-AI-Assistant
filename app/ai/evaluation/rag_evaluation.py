@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from app.ai.evaluation.groundedness_evaluator import (
     GroundednessResult,
 )
+
 from app.ai.evaluation.semantic_relevance_evaluator import (
     SemanticRelevanceResult,
 )
@@ -13,6 +14,7 @@ class RAGEvaluationResult:
     retrieval_hit: bool
     groundedness: GroundednessResult
     semantic_relevance: SemanticRelevanceResult
+    source_count: int
     overall_pass: bool
 
 
@@ -20,6 +22,7 @@ def evaluate_rag_response(
     retrieval_hit: bool,
     groundedness: GroundednessResult,
     semantic_relevance: SemanticRelevanceResult,
+    source_count: int,
     groundedness_threshold: float = 1.0,
     semantic_relevance_threshold: float = 0.35,
 ) -> RAGEvaluationResult:
@@ -38,5 +41,6 @@ def evaluate_rag_response(
         retrieval_hit=retrieval_hit,
         groundedness=groundedness,
         semantic_relevance=semantic_relevance,
+        source_count=source_count,
         overall_pass=overall_pass,
     )

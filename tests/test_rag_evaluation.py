@@ -28,9 +28,11 @@ def test_rag_evaluation_passes_good_response():
         retrieval_hit=True,
         groundedness=groundedness,
         semantic_relevance=semantic_relevance,
+        source_count=1,
     )
 
     assert result.retrieval_hit is True
+    assert result.source_count == 1
     assert result.overall_pass is True
 
 
@@ -49,6 +51,7 @@ def test_rag_evaluation_fails_without_retrieval_hit():
         retrieval_hit=False,
         groundedness=groundedness,
         semantic_relevance=semantic_relevance,
+        source_count=1,
     )
 
     assert result.overall_pass is False
@@ -69,6 +72,7 @@ def test_rag_evaluation_fails_when_groundedness_is_low():
         retrieval_hit=True,
         groundedness=groundedness,
         semantic_relevance=semantic_relevance,
+        source_count=1,
     )
 
     assert result.overall_pass is False
@@ -89,6 +93,7 @@ def test_rag_evaluation_fails_when_semantic_relevance_is_low():
         retrieval_hit=True,
         groundedness=groundedness,
         semantic_relevance=semantic_relevance,
+        source_count=1,
     )
 
     assert result.overall_pass is False
@@ -109,8 +114,31 @@ def test_rag_evaluation_threshold_can_be_changed():
         retrieval_hit=True,
         groundedness=groundedness,
         semantic_relevance=semantic_relevance,
+        source_count=1,
         groundedness_threshold=0.8,
         semantic_relevance_threshold=0.35,
     )
 
+    assert result.overall_pass is True
+
+
+def test_rag_evaluation_tracks_multiple_sources():
+    groundedness = GroundednessResult(
+        score=1.0,
+        supported_sentences=2,
+        total_sentences=2,
+    )
+
+    semantic_relevance = SemanticRelevanceResult(
+        score=0.68,
+    )
+
+    result = evaluate_rag_response(
+        retrieval_hit=True,
+        groundedness=groundedness,
+        semantic_relevance=semantic_relevance,
+        source_count=3,
+    )
+
+    assert result.source_count == 3
     assert result.overall_pass is True

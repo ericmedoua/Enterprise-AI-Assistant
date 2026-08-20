@@ -10,10 +10,6 @@ class GroundednessResult:
 
 
 def _normalize_text(text: str) -> str:
-    """
-    Normalize text for simple lexical comparison.
-    """
-
     text = text.lower()
 
     text = re.sub(
@@ -31,13 +27,108 @@ def _normalize_text(text: str) -> str:
     return text.strip()
 
 
+def _content_tokens(text: str) -> set[str]:
+    stop_words = {
+        "a",
+        "an",
+        "and",
+        "are",
+        "as",
+        "be",
+        "been",
+        "by",
+        "from",
+        "has",
+        "have",
+        "in",
+        "is",
+        "it",
+        "of",
+        "on",
+        "that",
+        "the",
+        "their",
+        "they",
+        "this",
+        "to",
+        "was",
+        "were",
+        "with",
+    }
+
+    normalized = _normalize_text(text)
+
+    return {token for token in normalized.split() if token not in stop_words}
+
+
+def _extract_answer_sentences(answer: str) -> list[str]:
+    """
+    Remove the generated citation section and extract
+    the actual answer statements.
+    """
+
+    answer = re.split(
+        r"\bsources?\s*:",
+        answer,
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0]
+
+    sentences = []
+
+    for line in answer.splitlines():
+        line = line.strip()
+
+        if not line:
+            continue
+
+        line = re.sub(
+            r"^[-*•]\s*",
+            "",
+            line,
+        )
+
+        parts = re.split(
+            r"[.!?]+",
+            line,
+        )
+
+        for part in parts:
+            part = part.strip()
+
+            if part:
+                sentences.append(part)
+
+    return sentences
+
+
+def _sentence_support_score(
+    sentence: str,
+    context: str,
+) -> float:
+    sentence_tokens = _content_tokens(sentence)
+    context_tokens = _content_tokens(context)
+
+    if not sentence_tokens:
+        return 0.0
+
+    matched = sentence_tokens.intersection(context_tokens)
+
+    return len(matched) / len(sentence_tokens)
+
+
 def evaluate_groundedness(
     answer: str,
     context: str,
+    support_threshold: float = 0.5,
 ) -> GroundednessResult:
     """
-    Evaluate how much of the answer is directly supported
+    Evaluate how much of the answer is supported
     by the retrieved context.
+
+    A sentence is considered supported when at least
+    support_threshold of its content words occur in
+    the retrieved context.
     """
 
     if not answer.strip() or not context.strip():
@@ -47,16 +138,7 @@ def evaluate_groundedness(
             total_sentences=0,
         )
 
-    normalized_context = _normalize_text(context)
-
-    sentences = [
-        sentence.strip()
-        for sentence in re.split(
-            r"[.!?]+",
-            answer,
-        )
-        if sentence.strip()
-    ]
+    sentences = _extract_answer_sentences(answer)
 
     if not sentences:
         return GroundednessResult(
@@ -68,9 +150,12 @@ def evaluate_groundedness(
     supported = 0
 
     for sentence in sentences:
-        normalized_sentence = _normalize_text(sentence)
+        support_score = _sentence_support_score(
+            sentence,
+            context,
+        )
 
-        if normalized_sentence in normalized_context:
+        if support_score >= support_threshold:
             supported += 1
 
     total = len(sentences)
@@ -86,10 +171,6 @@ def groundedness_score(
     answer: str,
     context: str,
 ) -> float:
-    """
-    Backwards-compatible convenience function.
-    """
-
     return evaluate_groundedness(
         answer,
         context,
@@ -100,9 +181,4 @@ def is_grounded(
     result: GroundednessResult,
     threshold: float = 1.0,
 ) -> bool:
-    """
-    Return True when the groundedness score meets
-    or exceeds the configured threshold.
-    """
-
     return result.score >= threshold

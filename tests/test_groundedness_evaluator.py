@@ -108,3 +108,44 @@ def test_is_not_grounded_when_score_is_below_threshold():
         )
         is False
     )
+
+
+def test_supported_paraphrased_sentence():
+    result = evaluate_groundedness(
+        "Monkeys love bananas.",
+        "Monkeys swing from trees and love bananas.",
+    )
+
+    assert result.score == 1.0
+
+
+def test_source_section_is_ignored():
+    result = evaluate_groundedness(
+        "Monkeys swing from trees.\n\nSource: This Book Belongs To.pdf (Page 29)",
+        "Monkeys swing from trees and love bananas.",
+    )
+
+    assert result.score == 1.0
+
+
+def test_bullet_point_answer_is_evaluated_correctly():
+    result = evaluate_groundedness(
+        "- Monkeys swing from trees.\n"
+        "- Monkeys love bananas.\n\n"
+        "Source: This Book Belongs To.pdf (Page 29)",
+        "Monkeys swing from trees and love bananas.",
+    )
+
+    assert result.score == 1.0
+    assert result.supported_sentences == 2
+    assert result.total_sentences == 2
+
+
+def test_reindeer_paraphrase_is_supported():
+    result = evaluate_groundedness(
+        "- Reindeer have antlers.\n"
+        "- In stories, reindeer are described as pulling sleds.",
+        "Reindeer have antlers and pull sleds in stories.",
+    )
+
+    assert result.score == 1.0

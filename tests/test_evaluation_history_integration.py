@@ -19,6 +19,9 @@ def test_compare_latest_runs_in_database():
 
         previous = repository.create_run(
             dataset_name="history-test-v1",
+            llm_model="openai/gpt-oss-120b",
+            embedding_model="all-MiniLM-L6-v2",
+            git_commit="test-commit",
             total_cases=2,
             retrieval_hit_rate=1.0,
             average_groundedness=1.0,
@@ -30,6 +33,9 @@ def test_compare_latest_runs_in_database():
 
         current = repository.create_run(
             dataset_name="history-test-v2",
+            llm_model="openai/gpt-oss-120b",
+            embedding_model="all-MiniLM-L6-v2",
+            git_commit="test-commit",
             total_cases=2,
             retrieval_hit_rate=1.0,
             average_groundedness=0.75,

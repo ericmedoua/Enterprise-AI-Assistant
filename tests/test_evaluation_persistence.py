@@ -36,6 +36,9 @@ def test_persist_evaluation():
     result = persist_evaluation(
         db=db,
         dataset_name="rag-evaluation-v1",
+        llm_model="openai/gpt-oss-120b",
+        embedding_model="all-MiniLM-L6-v2",
+        git_commit="test-commit",
         report=report,
         quality_gate=quality_gate,
     )

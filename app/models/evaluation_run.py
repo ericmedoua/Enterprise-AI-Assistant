@@ -26,6 +26,21 @@ class EvaluationRun(Base):
         nullable=False,
     )
 
+    llm_model: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+
+    embedding_model: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+
+    git_commit: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+    )
+
     total_cases: Mapped[int] = mapped_column(
         Integer,
         nullable=False,

@@ -21,6 +21,9 @@ class EvaluationRepository:
     def create_run(
         self,
         dataset_name: str,
+        llm_model: str,
+        embedding_model: str,
+        git_commit: str,
         total_cases: int,
         retrieval_hit_rate: float,
         average_groundedness: float,
@@ -32,6 +35,9 @@ class EvaluationRepository:
 
         evaluation_run = EvaluationRun(
             dataset_name=dataset_name,
+            llm_model=llm_model,
+            embedding_model=embedding_model,
+            git_commit=git_commit,
             total_cases=total_cases,
             retrieval_hit_rate=retrieval_hit_rate,
             average_groundedness=average_groundedness,
@@ -68,12 +74,18 @@ class EvaluationRepository:
     def create_from_evaluation(
         self,
         dataset_name: str,
+        llm_model: str,
+        embedding_model: str,
+        git_commit: str,
         report: EvaluationReport,
         quality_gate: QualityGateResult,
     ) -> EvaluationRun:
 
         return self.create_run(
             dataset_name=dataset_name,
+            llm_model=llm_model,
+            embedding_model=embedding_model,
+            git_commit=git_commit,
             total_cases=report.total_cases,
             retrieval_hit_rate=report.retrieval_hit_rate,
             average_groundedness=report.average_groundedness,

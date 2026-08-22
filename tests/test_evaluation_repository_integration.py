@@ -12,6 +12,9 @@ def test_create_and_read_evaluation_run():
 
         created = repository.create_run(
             dataset_name="rag-evaluation-v1",
+            llm_model="openai/gpt-oss-120b",
+            embedding_model="all-MiniLM-L6-v2",
+            git_commit="test-commit",
             total_cases=2,
             retrieval_hit_rate=1.0,
             average_groundedness=1.0,
@@ -47,6 +50,9 @@ def test_list_evaluation_runs():
 
         first = repository.create_run(
             dataset_name="rag-evaluation-v1",
+            llm_model="openai/gpt-oss-120b",
+            embedding_model="all-MiniLM-L6-v2",
+            git_commit="test-commit",
             total_cases=2,
             retrieval_hit_rate=1.0,
             average_groundedness=1.0,
@@ -58,6 +64,9 @@ def test_list_evaluation_runs():
 
         second = repository.create_run(
             dataset_name="rag-evaluation-v2",
+            llm_model="openai/gpt-oss-120b",
+            embedding_model="all-MiniLM-L6-v2",
+            git_commit="test-commit",
             total_cases=2,
             retrieval_hit_rate=0.5,
             average_groundedness=0.8,
@@ -92,6 +101,9 @@ def test_get_latest_run():
 
         first = repository.create_run(
             dataset_name="historical-v1",
+            llm_model="openai/gpt-oss-120b",
+            embedding_model="all-MiniLM-L6-v2",
+            git_commit="test-commit",
             total_cases=2,
             retrieval_hit_rate=1.0,
             average_groundedness=1.0,
@@ -103,6 +115,9 @@ def test_get_latest_run():
 
         second = repository.create_run(
             dataset_name="historical-v2",
+            llm_model="openai/gpt-oss-120b",
+            embedding_model="all-MiniLM-L6-v2",
+            git_commit="test-commit",
             total_cases=2,
             retrieval_hit_rate=1.0,
             average_groundedness=0.75,
@@ -134,6 +149,9 @@ def test_get_previous_run():
 
         first = repository.create_run(
             dataset_name="historical-v1",
+            llm_model="openai/gpt-oss-120b",
+            embedding_model="all-MiniLM-L6-v2",
+            git_commit="test-commit",
             total_cases=2,
             retrieval_hit_rate=1.0,
             average_groundedness=1.0,
@@ -145,6 +163,9 @@ def test_get_previous_run():
 
         second = repository.create_run(
             dataset_name="historical-v2",
+            llm_model="openai/gpt-oss-120b",
+            embedding_model="all-MiniLM-L6-v2",
+            git_commit="test-commit",
             total_cases=2,
             retrieval_hit_rate=1.0,
             average_groundedness=0.75,

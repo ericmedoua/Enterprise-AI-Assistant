@@ -20,6 +20,9 @@ def test_create_run():
 
     result = repository.create_run(
         dataset_name="rag-evaluation-v1",
+        llm_model="openai/gpt-oss-120b",
+        embedding_model="all-MiniLM-L6-v2",
+        git_commit="test-commit",
         total_cases=2,
         retrieval_hit_rate=1.0,
         average_groundedness=1.0,
@@ -64,11 +67,18 @@ def test_create_from_evaluation():
 
     result = repository.create_from_evaluation(
         dataset_name="rag-evaluation-v1",
+        llm_model="openai/gpt-oss-120b",
+        embedding_model="all-MiniLM-L6-v2",
+        git_commit="test-commit",
         report=report,
         quality_gate=quality_gate,
     )
 
     assert result.dataset_name == ("rag-evaluation-v1")
+
+    assert result.llm_model == "openai/gpt-oss-120b"
+    assert result.embedding_model == "all-MiniLM-L6-v2"
+    assert result.git_commit == "test-commit"
 
     assert result.total_cases == 2
     assert result.retrieval_hit_rate == 1.0

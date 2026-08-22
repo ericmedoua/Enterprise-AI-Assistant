@@ -18,10 +18,8 @@ from tests.data.rag_evaluation_dataset import (
     RAG_EVALUATION_DATASET,
 )
 
-from app.core.config import settings
-
-from app.core.git_metadata import (
-    get_git_commit,
+from app.ai.evaluation.evaluation_metadata import (
+    get_evaluation_metadata,
 )
 
 
@@ -50,13 +48,15 @@ def test_real_rag_quality_gate():
 
     db = SessionLocal()
 
+    metadata = get_evaluation_metadata()
+
     try:
         evaluation_run = persist_evaluation(
             db=db,
             dataset_name="rag-evaluation-v1",
-            llm_model=settings.GROQ_MODEL,
-            embedding_model=settings.EMBEDDING_MODEL,
-            git_commit=get_git_commit(),
+            llm_model=metadata.llm_model,
+            embedding_model=metadata.embedding_model,
+            git_commit=metadata.git_commit,
             report=report,
             quality_gate=result,
         )

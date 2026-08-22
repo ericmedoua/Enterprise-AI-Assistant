@@ -119,3 +119,38 @@ def test_get_previous_run():
     assert result is previous
 
     db.query.return_value.filter.assert_called_once()
+
+
+def test_list_runs_by_dataset():
+    db = Mock()
+
+    repository = EvaluationRepository(db)
+
+    expected = [Mock()]
+
+    (
+        db.query.return_value.filter.return_value.order_by.return_value.all.return_value
+    ) = expected
+
+    result = repository.list_runs_by_dataset("rag-evaluation-v1")
+
+    assert result is expected
+
+
+def test_list_runs_by_model():
+    db = Mock()
+
+    repository = EvaluationRepository(db)
+
+    expected = [Mock()]
+
+    (
+        db.query.return_value.filter.return_value.order_by.return_value.all.return_value
+    ) = expected
+
+    result = repository.list_runs_by_model(
+        "openai/gpt-oss-120b",
+        "all-MiniLM-L6-v2",
+    )
+
+    assert result is expected

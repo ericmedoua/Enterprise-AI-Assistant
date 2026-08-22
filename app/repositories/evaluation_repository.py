@@ -120,3 +120,37 @@ class EvaluationRepository:
             )
             .first()
         )
+
+    def list_runs_by_dataset(
+    self,
+    dataset_name: str,
+) -> list[EvaluationRun]:
+        return (
+            self.db.query(EvaluationRun)
+            .filter(
+                EvaluationRun.dataset_name == dataset_name,
+            )
+            .order_by(
+                EvaluationRun.created_at.desc(),
+                EvaluationRun.id.desc(),
+            )
+            .all()
+        )
+
+    def list_runs_by_model(
+        self,
+        llm_model: str,
+        embedding_model: str,
+    ) -> list[EvaluationRun]:
+        return (
+            self.db.query(EvaluationRun)
+            .filter(
+                EvaluationRun.llm_model == llm_model,
+                EvaluationRun.embedding_model == embedding_model,
+            )
+            .order_by(
+                EvaluationRun.created_at.desc(),
+                EvaluationRun.id.desc(),
+            )
+            .all()
+        )

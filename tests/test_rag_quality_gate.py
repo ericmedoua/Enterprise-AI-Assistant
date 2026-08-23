@@ -1,3 +1,5 @@
+import json
+
 from app.ai.evaluation.benchmark import (
     run_rag_evaluation_report,
 )
@@ -20,6 +22,16 @@ from tests.data.rag_evaluation_dataset import (
 
 from app.ai.evaluation.evaluation_metadata import (
     get_evaluation_metadata,
+)
+from app.ai.evaluation.evaluation_snapshot_service import (
+    build_evaluation_snapshot,
+)
+
+from app.ai.evaluation.evaluation_snapshot_report import (
+    format_evaluation_snapshot,
+)
+from app.repositories.evaluation_repository import (
+    EvaluationRepository,
 )
 
 
@@ -61,9 +73,38 @@ def test_real_rag_quality_gate():
             quality_gate=result,
         )
 
+        repository = EvaluationRepository(db)
+
+        snapshot = build_evaluation_snapshot(
+            repository=repository,
+            dataset_name="rag-evaluation-v1",
+            report=report,
+            quality_gate=result,
+            current_run_id=evaluation_run.id,
+        )
+
+        print("\n" + format_evaluation_snapshot(snapshot))
+        print("\nEVALUATION_SNAPSHOT_JSON")
+        print(
+            json.dumps(
+                snapshot.to_dict(),
+                indent=2,
+            )
+        )
+
+        assert snapshot.dataset_name == "rag-evaluation-v1"
+        assert snapshot.report is report
+        assert snapshot.quality_gate is result
+        previous_run = repository.get_previous_run(evaluation_run.id)
+
+        if previous_run is not None:
+            assert snapshot.comparison is not None
+        else:
+            assert snapshot.comparison is None
+
         assert evaluation_run.id is not None
 
-        assert evaluation_run.dataset_name == ("rag-evaluation-v1")
+        assert evaluation_run.dataset_name == "rag-evaluation-v1"
 
         assert evaluation_run.total_cases == report.total_cases
 

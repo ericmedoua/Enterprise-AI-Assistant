@@ -33,6 +33,9 @@ from app.ai.evaluation.evaluation_snapshot_report import (
 from app.repositories.evaluation_repository import (
     EvaluationRepository,
 )
+from app.ai.evaluation.evaluation_snapshot_writer import (
+    write_evaluation_snapshot,
+)
 
 
 def test_real_rag_quality_gate():
@@ -83,6 +86,11 @@ def test_real_rag_quality_gate():
             current_run_id=evaluation_run.id,
         )
 
+        snapshot_path = write_evaluation_snapshot(
+            snapshot,
+            "artifacts/evaluation_snapshot.json",
+        )
+
         print("\n" + format_evaluation_snapshot(snapshot))
         print("\nEVALUATION_SNAPSHOT_JSON")
         print(
@@ -91,6 +99,7 @@ def test_real_rag_quality_gate():
                 indent=2,
             )
         )
+        print(f"\nEvaluation snapshot: {snapshot_path}")
 
         assert snapshot.dataset_name == "rag-evaluation-v1"
         assert snapshot.report is report

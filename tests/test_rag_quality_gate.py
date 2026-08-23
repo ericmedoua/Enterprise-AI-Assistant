@@ -36,6 +36,13 @@ from app.repositories.evaluation_repository import (
 from app.ai.evaluation.evaluation_snapshot_writer import (
     write_evaluation_snapshot,
 )
+from app.ai.evaluation.evaluation_observability import (
+    build_evaluation_event,
+)
+
+from app.ai.evaluation.evaluation_observability_logger import (
+    log_evaluation_event,
+)
 
 
 def test_real_rag_quality_gate():
@@ -89,6 +96,12 @@ def test_real_rag_quality_gate():
         snapshot_path = write_evaluation_snapshot(
             snapshot,
             "artifacts/evaluation_snapshot.json",
+        )
+
+        event = build_evaluation_event(snapshot)
+
+        log_evaluation_event(
+            event
         )
 
         print("\n" + format_evaluation_snapshot(snapshot))

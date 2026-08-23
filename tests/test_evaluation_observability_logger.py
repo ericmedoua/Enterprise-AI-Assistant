@@ -35,3 +35,13 @@ def test_log_evaluation_event():
         assert "RAG evaluation completed" in message
 
         assert "rag-evaluation-v1" in message
+
+        assert "quality_gate_passed=False" in message
+
+        assert "retrieval_hit_rate=1.0000" in message
+
+        assert "groundedness=0.7500" in message
+
+        assert "semantic_relevance=0.6000" in message
+
+        assert "overall_pass_rate=0.5000" in message

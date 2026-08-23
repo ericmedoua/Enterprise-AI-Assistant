@@ -48,3 +48,9 @@ def build_evaluation_event(
         quality_gate_passed=(snapshot.quality_gate.passed),
         has_historical_comparison=(snapshot.comparison is not None),
     )
+
+
+def evaluation_event_payload(
+    event: EvaluationObservabilityEvent,
+) -> dict:
+    return event.to_dict()

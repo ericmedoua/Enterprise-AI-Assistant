@@ -3,23 +3,23 @@
   "report": {
     "total_cases": 2,
     "retrieval_hit_rate": 1.0,
-    "average_groundedness": 1.0,
-    "average_semantic_relevance": 0.40279923947366447,
+    "average_groundedness": 0.75,
+    "average_semantic_relevance": 0.6003416090472575,
     "average_source_count": 1.0,
     "overall_pass_rate": 0.5
   },
   "quality_gate": {
     "passed": false,
     "retrieval_passed": true,
-    "groundedness_passed": true,
-    "semantic_relevance_passed": false,
+    "groundedness_passed": false,
+    "semantic_relevance_passed": true,
     "overall_passed": false
   },
   "comparison": {
     "retrieval_hit_rate_delta": 0.0,
-    "groundedness_delta": 0.0,
-    "semantic_relevance_delta": 0.0,
+    "groundedness_delta": -0.25,
+    "semantic_relevance_delta": -0.006568487561650738,
     "source_count_delta": 0.0,
-    "overall_pass_rate_delta": 0.0
+    "overall_pass_rate_delta": -0.5
   }
 }

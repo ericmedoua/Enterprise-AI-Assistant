@@ -6,7 +6,9 @@ from app.api.auth import router as auth_router
 from app.api.documents import router as documents_router
 from app.api.chat import router as chat_router
 from app.api.debug import router as debug_router
-
+from app.api.evaluations import (
+    router as evaluations_router,
+)
 
 router = APIRouter()
 
@@ -32,4 +34,8 @@ router.include_router(
 
 router.include_router(
     debug_router,
+)
+
+router.include_router(
+    evaluations_router,
 )

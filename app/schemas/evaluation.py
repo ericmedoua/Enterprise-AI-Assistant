@@ -11,6 +11,7 @@ class EvaluationRunResponse(BaseModel):
     llm_model: str
     embedding_model: str
     git_commit: str
+    status: str
 
     total_cases: int
     retrieval_hit_rate: float
@@ -44,3 +45,8 @@ class EvaluationSnapshotResponse(BaseModel):
 class EvaluationDashboardResponse(BaseModel):
     latest: EvaluationRunResponse
     comparison: EvaluationComparisonResponse | None
+
+
+class EvaluationRunStartResponse(BaseModel):
+    evaluation_run_id: int
+    snapshot: dict

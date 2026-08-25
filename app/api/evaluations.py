@@ -29,6 +29,21 @@ from app.ai.evaluation.evaluation_snapshot import (
 from app.schemas.evaluation import (
     EvaluationDashboardResponse,
 )
+from app.ai.evaluation.evaluation_metadata import (
+    get_evaluation_metadata,
+)
+
+from app.ai.evaluation.evaluation_runner import (
+    EvaluationRunner,
+)
+
+from app.ai.evaluation.evaluation_snapshot import (
+    EvaluationSnapshot,
+)
+
+from app.schemas.evaluation import (
+    EvaluationRunStartResponse,
+)
 
 router = APIRouter(
     prefix="/evaluations",
@@ -44,6 +59,7 @@ def _to_response(run):
         llm_model=run.llm_model,
         embedding_model=run.embedding_model,
         git_commit=run.git_commit,
+        status=run.status,
         total_cases=run.total_cases,
         retrieval_hit_rate=run.retrieval_hit_rate,
         average_groundedness=run.average_groundedness,
@@ -251,4 +267,26 @@ def get_evaluation_snapshot(
         report=report,
         quality_gate=quality_gate,
         comparison=comparison_data,
+    )
+
+
+@router.post(
+    "/run",
+    response_model=EvaluationRunStartResponse,
+)
+def start_evaluation_run(
+    db: Session = Depends(get_db),
+):
+    metadata = get_evaluation_metadata()
+
+    runner = EvaluationRunner(
+        db=db,
+        metadata=metadata,
+    )
+
+    result = runner.run()
+
+    return EvaluationRunStartResponse(
+        evaluation_run_id=result.evaluation_run_id,
+        snapshot=result.snapshot.to_dict(),
     )

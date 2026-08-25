@@ -1,7 +1,7 @@
 import pytest
 
 from datetime import datetime
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from fastapi.testclient import TestClient
 
@@ -23,6 +23,7 @@ def make_evaluation_run(
         llm_model="openai/gpt-oss-120b",
         embedding_model="all-MiniLM-L6-v2",
         git_commit="a" * 40,
+        status="completed",
         total_cases=2,
         retrieval_hit_rate=1.0,
         average_groundedness=1.0,
@@ -49,6 +50,7 @@ def test_get_latest_evaluation(
 
     assert data["id"] == 1
     assert data["dataset_name"] == ("rag-evaluation-v1")
+    assert data["status"] == "completed"
     assert data["llm_model"] == ("openai/gpt-oss-120b")
     assert data["embedding_model"] == ("all-MiniLM-L6-v2")
     assert data["git_commit"] == "a" * 40
@@ -102,8 +104,10 @@ def test_get_evaluation_history(
 
     assert data["runs"][0]["id"] == 2
     assert data["runs"][0]["dataset_name"] == ("rag-evaluation-v2")
+    assert data["runs"][0]["status"] == "completed"
 
     assert data["runs"][1]["id"] == 1
+    assert data["runs"][1]["status"] == "completed"
 
 
 @patch("app.api.evaluations.EvaluationRepository")
@@ -326,3 +330,71 @@ def test_get_evaluation_dashboard_without_history(
 
     assert data["latest"]["id"] == 10
     assert data["comparison"] is None
+
+
+@patch("app.api.evaluations.get_evaluation_metadata")
+@patch("app.api.evaluations.EvaluationRunner")
+def test_start_evaluation_run(
+    mock_runner,
+    mock_metadata,
+):
+    metadata = Mock(
+        llm_model="openai/gpt-oss-120b",
+        embedding_model="all-MiniLM-L6-v2",
+        git_commit="a" * 40,
+    )
+
+    snapshot = Mock()
+
+    snapshot.to_dict.return_value = {
+        "dataset_name": "rag-evaluation-v1",
+        "report": {},
+        "quality_gate": {},
+        "comparison": None,
+    }
+
+    runner_result = Mock(
+        evaluation_run_id=42,
+        snapshot=snapshot,
+    )
+
+    mock_metadata.return_value = metadata
+    mock_runner.return_value.run.return_value = runner_result
+
+    response = client.post("/api/v1/evaluations/run")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["evaluation_run_id"] == 42
+    assert data["snapshot"]["dataset_name"] == ("rag-evaluation-v1")
+
+    mock_runner.assert_called_once_with(
+        db=mock_runner.call_args.kwargs["db"],
+        metadata=metadata,
+    )
+
+    mock_runner.return_value.run.assert_called_once_with()
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_run_status(
+    mock_repository,
+):
+    run = make_evaluation_run(
+        run_id=25,
+    )
+
+    run.status = "failed"
+
+    mock_repository.return_value.get_run.return_value = run
+
+    response = client.get("/api/v1/evaluations/25")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["id"] == 25
+    assert data["status"] == "failed"

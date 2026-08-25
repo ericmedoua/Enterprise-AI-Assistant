@@ -75,3 +75,9 @@ class EvaluationRun(Base):
         Boolean,
         nullable=False,
     )
+
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="completed",
+    )

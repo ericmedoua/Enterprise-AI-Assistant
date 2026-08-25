@@ -122,9 +122,9 @@ class EvaluationRepository:
         )
 
     def list_runs_by_dataset(
-    self,
-    dataset_name: str,
-) -> list[EvaluationRun]:
+        self,
+        dataset_name: str,
+    ) -> list[EvaluationRun]:
         return (
             self.db.query(EvaluationRun)
             .filter(
@@ -154,3 +154,59 @@ class EvaluationRepository:
             )
             .all()
         )
+
+    def update_results(
+        self,
+        run_id: int,
+        total_cases: int,
+        retrieval_hit_rate: float,
+        average_groundedness: float,
+        average_semantic_relevance: float,
+        average_source_count: float,
+        overall_pass_rate: float,
+        quality_gate_passed: bool,
+        status: str,
+    ) -> EvaluationRun | None:
+        run = self.db.get(
+            EvaluationRun,
+            run_id,
+        )
+
+        if run is None:
+            return None
+
+        run.total_cases = total_cases
+        run.retrieval_hit_rate = retrieval_hit_rate
+        run.average_groundedness = average_groundedness
+        run.average_semantic_relevance = (
+            average_semantic_relevance
+        )
+        run.average_source_count = average_source_count
+        run.overall_pass_rate = overall_pass_rate
+        run.quality_gate_passed = quality_gate_passed
+        run.status = status
+
+        self.db.commit()
+        self.db.refresh(run)
+
+        return run
+
+    def update_status(
+        self,
+        run_id: int,
+        status: str,
+    ) -> EvaluationRun | None:
+        run = self.db.get(
+            EvaluationRun,
+            run_id,
+        )
+
+        if run is None:
+            return None
+
+        run.status = status
+
+        self.db.commit()
+        self.db.refresh(run)
+
+        return run

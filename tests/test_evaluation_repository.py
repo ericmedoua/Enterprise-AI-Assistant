@@ -154,3 +154,56 @@ def test_list_runs_by_model():
     )
 
     assert result is expected
+
+
+def test_update_status():
+    db = Mock()
+
+    run = Mock(
+        id=10,
+        status="running",
+    )
+
+    db.get.return_value = run
+
+    repository = EvaluationRepository(db)
+
+    result = repository.update_status(
+        run_id=10,
+        status="completed",
+    )
+
+    assert result is run
+    assert run.status == "completed"
+    db.commit.assert_called_once()
+    db.refresh.assert_called_once_with(run)
+
+
+def test_update_results():
+    db = Mock()
+
+    run = Mock(
+        id=10,
+    )
+
+    db.get.return_value = run
+
+    repository = EvaluationRepository(db)
+
+    result = repository.update_results(
+        run_id=10,
+        total_cases=2,
+        retrieval_hit_rate=1.0,
+        average_groundedness=0.95,
+        average_semantic_relevance=0.60,
+        average_source_count=1.0,
+        overall_pass_rate=1.0,
+        quality_gate_passed=True,
+        status="completed",
+    )
+
+    assert result is run
+    assert run.total_cases == 2
+    assert run.average_groundedness == 0.95
+    assert run.quality_gate_passed is True
+    assert run.status == "completed"

@@ -39,3 +39,8 @@ class EvaluationSnapshotResponse(BaseModel):
     report: dict
     quality_gate: dict
     comparison: dict | None
+
+
+class EvaluationDashboardResponse(BaseModel):
+    latest: EvaluationRunResponse
+    comparison: EvaluationComparisonResponse | None

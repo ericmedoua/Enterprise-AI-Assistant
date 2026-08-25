@@ -268,3 +268,61 @@ def test_get_evaluation_snapshot_without_history(
     assert data["dataset_name"] == ("rag-evaluation-v1")
 
     assert data["comparison"] is None
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_dashboard(
+    mock_repository,
+):
+    previous = make_evaluation_run(
+        run_id=1,
+    )
+
+    latest = make_evaluation_run(
+        run_id=2,
+    )
+
+    latest.average_groundedness = 0.75
+    latest.average_semantic_relevance = 0.65
+    latest.overall_pass_rate = 0.50
+
+    mock_repository.return_value.get_latest_run.return_value = latest
+
+    mock_repository.return_value.get_previous_run.return_value = previous
+
+    response = client.get("/api/v1/evaluations/dashboard")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["latest"]["id"] == 2
+    assert data["latest"]["dataset_name"] == "rag-evaluation-v1"
+
+    assert data["comparison"] is not None
+
+    assert data["comparison"]["groundedness_delta"] == pytest.approx(-0.25)
+
+    assert data["comparison"]["semantic_relevance_delta"] == pytest.approx(0.05)
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_dashboard_without_history(
+    mock_repository,
+):
+    latest = make_evaluation_run(
+        run_id=10,
+    )
+
+    mock_repository.return_value.get_latest_run.return_value = latest
+
+    mock_repository.return_value.get_previous_run.return_value = None
+
+    response = client.get("/api/v1/evaluations/dashboard")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["latest"]["id"] == 10
+    assert data["comparison"] is None

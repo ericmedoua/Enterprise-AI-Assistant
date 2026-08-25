@@ -16,7 +16,7 @@ from app.database.session import (
     SessionLocal,
 )
 
-from tests.data.rag_evaluation_dataset import (
+from app.ai.evaluation.datasets.rag_evaluation_dataset import (
     RAG_EVALUATION_DATASET,
 )
 
@@ -100,9 +100,7 @@ def test_real_rag_quality_gate():
 
         event = build_evaluation_event(snapshot)
 
-        log_evaluation_event(
-            event
-        )
+        log_evaluation_event(event)
 
         print("\n" + format_evaluation_snapshot(snapshot))
         print("\nEVALUATION_SNAPSHOT_JSON")

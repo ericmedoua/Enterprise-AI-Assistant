@@ -26,6 +26,9 @@ from app.ai.evaluation.evaluation_snapshot_service import (
 from app.ai.evaluation.evaluation_snapshot import (
     EvaluationSnapshot,
 )
+from app.schemas.evaluation import (
+    EvaluationDashboardResponse,
+)
 
 router = APIRouter(
     prefix="/evaluations",
@@ -83,6 +86,47 @@ def get_evaluation_history(
     runs = repository.list_runs()
 
     return EvaluationHistoryResponse(runs=[_to_response(run) for run in runs])
+
+
+@router.get(
+    "/dashboard",
+    response_model=EvaluationDashboardResponse,
+)
+def get_evaluation_dashboard(
+    db: Session = Depends(get_db),
+):
+    repository = EvaluationRepository(db)
+
+    latest = repository.get_latest_run()
+
+    if latest is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No evaluation runs found.",
+        )
+
+    previous = repository.get_previous_run(latest.id)
+
+    comparison_response = None
+
+    if previous is not None:
+        comparison = compare_evaluation_runs(
+            previous=previous,
+            current=latest,
+        )
+
+        comparison_response = EvaluationComparisonResponse(
+            retrieval_hit_rate_delta=(comparison.retrieval_hit_rate_delta),
+            groundedness_delta=(comparison.groundedness_delta),
+            semantic_relevance_delta=(comparison.semantic_relevance_delta),
+            source_count_delta=(comparison.source_count_delta),
+            overall_pass_rate_delta=(comparison.overall_pass_rate_delta),
+        )
+
+    return EvaluationDashboardResponse(
+        latest=_to_response(latest),
+        comparison=comparison_response,
+    )
 
 
 @router.get(
@@ -145,6 +189,7 @@ def get_evaluation_comparison(
         overall_pass_rate_delta=(comparison.overall_pass_rate_delta),
     )
 
+
 @router.get(
     "/{run_id}/snapshot",
     response_model=EvaluationSnapshotResponse,
@@ -180,18 +225,10 @@ def get_evaluation_snapshot(
     report = {
         "total_cases": run.total_cases,
         "retrieval_hit_rate": run.retrieval_hit_rate,
-        "average_groundedness": (
-            run.average_groundedness
-        ),
-        "average_semantic_relevance": (
-            run.average_semantic_relevance
-        ),
-        "average_source_count": (
-            run.average_source_count
-        ),
-        "overall_pass_rate": (
-            run.overall_pass_rate
-        ),
+        "average_groundedness": (run.average_groundedness),
+        "average_semantic_relevance": (run.average_semantic_relevance),
+        "average_source_count": (run.average_source_count),
+        "overall_pass_rate": (run.overall_pass_rate),
     }
 
     quality_gate = {
@@ -202,21 +239,11 @@ def get_evaluation_snapshot(
 
     if comparison is not None:
         comparison_data = {
-            "retrieval_hit_rate_delta": (
-                comparison.retrieval_hit_rate_delta
-            ),
-            "groundedness_delta": (
-                comparison.groundedness_delta
-            ),
-            "semantic_relevance_delta": (
-                comparison.semantic_relevance_delta
-            ),
-            "source_count_delta": (
-                comparison.source_count_delta
-            ),
-            "overall_pass_rate_delta": (
-                comparison.overall_pass_rate_delta
-            ),
+            "retrieval_hit_rate_delta": (comparison.retrieval_hit_rate_delta),
+            "groundedness_delta": (comparison.groundedness_delta),
+            "semantic_relevance_delta": (comparison.semantic_relevance_delta),
+            "source_count_delta": (comparison.source_count_delta),
+            "overall_pass_rate_delta": (comparison.overall_pass_rate_delta),
         }
 
     return EvaluationSnapshotResponse(

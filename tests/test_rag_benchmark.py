@@ -2,7 +2,7 @@ from app.ai.evaluation.benchmark import (
     run_rag_benchmark,
 )
 
-from tests.data.rag_evaluation_dataset import (
+from app.ai.evaluation.datasets.rag_evaluation_dataset import (
     RAG_EVALUATION_DATASET,
 )
 

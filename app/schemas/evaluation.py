@@ -49,4 +49,4 @@ class EvaluationDashboardResponse(BaseModel):
 
 class EvaluationRunStartResponse(BaseModel):
     evaluation_run_id: int
-    snapshot: dict
+    status: str

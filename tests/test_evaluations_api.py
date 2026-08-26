@@ -344,38 +344,28 @@ def test_start_evaluation_run(
         git_commit="a" * 40,
     )
 
-    snapshot = Mock()
-
-    snapshot.to_dict.return_value = {
-        "dataset_name": "rag-evaluation-v1",
-        "report": {},
-        "quality_gate": {},
-        "comparison": None,
-    }
-
-    runner_result = Mock(
-        evaluation_run_id=42,
-        snapshot=snapshot,
+    queued_run = Mock(
+        id=42,
+        status="queued",
     )
 
     mock_metadata.return_value = metadata
-    mock_runner.return_value.run.return_value = runner_result
+    mock_runner.return_value.create_run.return_value = queued_run
 
     response = client.post("/api/v1/evaluations/run")
 
-    assert response.status_code == 200
+    assert response.status_code == 202
 
     data = response.json()
 
     assert data["evaluation_run_id"] == 42
-    assert data["snapshot"]["dataset_name"] == ("rag-evaluation-v1")
+    assert data["status"] == "queued"
 
-    mock_runner.assert_called_once_with(
-        db=mock_runner.call_args.kwargs["db"],
-        metadata=metadata,
-    )
+    assert mock_runner.call_count == 2
 
-    mock_runner.return_value.run.assert_called_once_with()
+    mock_runner.return_value.create_run.assert_called_once()
+
+    mock_runner.return_value.execute_run.assert_called_once_with(42)
 
 
 @patch("app.api.evaluations.EvaluationRepository")
@@ -398,3 +388,117 @@ def test_get_evaluation_run_status(
 
     assert data["id"] == 25
     assert data["status"] == "failed"
+
+
+@patch("app.api.evaluations.app_logger")
+@patch("app.api.evaluations.get_evaluation_metadata")
+@patch("app.api.evaluations.EvaluationRunner")
+def test_start_evaluation_run_failure(
+    mock_runner,
+    mock_metadata,
+    mock_logger,
+):
+    metadata = Mock(
+        llm_model="openai/gpt-oss-120b",
+        embedding_model="all-MiniLM-L6-v2",
+        git_commit="a" * 40,
+    )
+
+    queued_run = Mock(
+        id=42,
+        status="queued",
+    )
+
+    mock_metadata.return_value = metadata
+
+    mock_runner.return_value.create_run.return_value = queued_run
+
+    mock_runner.return_value.execute_run.side_effect = RuntimeError("benchmark failed")
+
+    response = client.post("/api/v1/evaluations/run")
+
+    assert response.status_code == 202
+
+    data = response.json()
+
+    assert data["evaluation_run_id"] == 42
+    assert data["status"] == "queued"
+
+    mock_runner.return_value.execute_run.assert_called_once_with(42)
+
+    mock_logger.exception.assert_called_once()
+
+
+@patch("app.api.evaluations.get_evaluation_metadata")
+@patch("app.api.evaluations.EvaluationRunner")
+@patch("app.api.evaluations.SessionLocal")
+def test_execute_evaluation_in_background(
+    mock_session_local,
+    mock_runner,
+    mock_metadata,
+):
+    metadata = Mock(
+        llm_model="openai/gpt-oss-120b",
+        embedding_model="all-MiniLM-L6-v2",
+        git_commit="a" * 40,
+    )
+
+    db = Mock()
+
+    mock_session_local.return_value = db
+    mock_metadata.return_value = metadata
+
+    from app.api.evaluations import (
+        _execute_evaluation_in_background,
+    )
+
+    _execute_evaluation_in_background(42)
+
+    mock_runner.assert_called_once_with(
+        db=db,
+        metadata=metadata,
+    )
+
+    mock_runner.return_value.execute_run.assert_called_once_with(42)
+
+    db.close.assert_called_once()
+
+
+@patch("app.api.evaluations.get_evaluation_metadata")
+@patch("app.api.evaluations.EvaluationRunner")
+@patch("app.api.evaluations.SessionLocal")
+@patch("app.api.evaluations.app_logger")
+def test_execute_evaluation_in_background_closes_session_on_failure(
+    mock_logger,
+    mock_session_local,
+    mock_runner,
+    mock_metadata,
+):
+    metadata = Mock(
+        llm_model="openai/gpt-oss-120b",
+        embedding_model="all-MiniLM-L6-v2",
+        git_commit="a" * 40,
+    )
+
+    db = Mock()
+
+    mock_session_local.return_value = db
+    mock_metadata.return_value = metadata
+
+    mock_runner.return_value.execute_run.side_effect = RuntimeError("benchmark failed")
+
+    from app.api.evaluations import (
+        _execute_evaluation_in_background,
+    )
+
+    _execute_evaluation_in_background(42)
+
+    mock_runner.assert_called_once_with(
+        db=db,
+        metadata=metadata,
+    )
+
+    mock_runner.return_value.execute_run.assert_called_once_with(42)
+
+    mock_logger.exception.assert_called_once()
+    db.close.assert_called_once()

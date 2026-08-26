@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
@@ -44,6 +44,13 @@ from app.ai.evaluation.evaluation_snapshot import (
 from app.schemas.evaluation import (
     EvaluationRunStartResponse,
 )
+from app.core.constants import (
+    EVALUATION_STATUS_QUEUED,
+)
+from app.database.session import (
+    SessionLocal,
+)
+from app.core.logger import app_logger
 
 router = APIRouter(
     prefix="/evaluations",
@@ -68,6 +75,32 @@ def _to_response(run):
         overall_pass_rate=run.overall_pass_rate,
         quality_gate_passed=run.quality_gate_passed,
     )
+
+
+def _execute_evaluation_in_background(
+    evaluation_run_id: int,
+) -> None:
+    db = SessionLocal()
+
+    try:
+        metadata = get_evaluation_metadata()
+
+        runner = EvaluationRunner(
+            db=db,
+            metadata=metadata,
+        )
+
+        runner.execute_run(evaluation_run_id)
+
+    except Exception:
+        # EvaluationRunner is responsible for marking
+        # the run as FAILED. The background task must
+        # not propagate the exception back into the
+        # already-completed HTTP response.
+        app_logger.exception(f"Evaluation run failed | run_id={evaluation_run_id}")
+
+    finally:
+        db.close()
 
 
 @router.get(
@@ -273,8 +306,10 @@ def get_evaluation_snapshot(
 @router.post(
     "/run",
     response_model=EvaluationRunStartResponse,
+    status_code=202,
 )
 def start_evaluation_run(
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     metadata = get_evaluation_metadata()
@@ -284,9 +319,14 @@ def start_evaluation_run(
         metadata=metadata,
     )
 
-    result = runner.run()
+    evaluation_run = runner.create_run()
+
+    background_tasks.add_task(
+        _execute_evaluation_in_background,
+        evaluation_run.id,
+    )
 
     return EvaluationRunStartResponse(
-        evaluation_run_id=result.evaluation_run_id,
-        snapshot=result.snapshot.to_dict(),
+        evaluation_run_id=evaluation_run.id,
+        status=evaluation_run.status,
     )

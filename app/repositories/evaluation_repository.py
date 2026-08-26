@@ -31,6 +31,7 @@ class EvaluationRepository:
         average_source_count: float,
         overall_pass_rate: float,
         quality_gate_passed: bool,
+        status: str = "completed",
     ) -> EvaluationRun:
 
         evaluation_run = EvaluationRun(
@@ -45,6 +46,7 @@ class EvaluationRepository:
             average_source_count=average_source_count,
             overall_pass_rate=overall_pass_rate,
             quality_gate_passed=quality_gate_passed,
+            status=status,
         )
 
         self.db.add(evaluation_run)
@@ -178,9 +180,7 @@ class EvaluationRepository:
         run.total_cases = total_cases
         run.retrieval_hit_rate = retrieval_hit_rate
         run.average_groundedness = average_groundedness
-        run.average_semantic_relevance = (
-            average_semantic_relevance
-        )
+        run.average_semantic_relevance = average_semantic_relevance
         run.average_source_count = average_source_count
         run.overall_pass_rate = overall_pass_rate
         run.quality_gate_passed = quality_gate_passed

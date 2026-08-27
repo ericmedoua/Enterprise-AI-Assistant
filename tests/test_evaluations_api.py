@@ -8,6 +8,8 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.models.evaluation_run import EvaluationRun
 
+from datetime import datetime, timedelta, timezone
+
 
 client = TestClient(app)
 
@@ -24,6 +26,22 @@ def make_evaluation_run(
         embedding_model="all-MiniLM-L6-v2",
         git_commit="a" * 40,
         status="completed",
+        started_at=datetime(
+            2026,
+            8,
+            26,
+            10,
+            0,
+            0,
+        ),
+        completed_at=datetime(
+            2026,
+            8,
+            26,
+            10,
+            0,
+            12,
+        ),
         total_cases=2,
         retrieval_hit_rate=1.0,
         average_groundedness=1.0,
@@ -51,6 +69,7 @@ def test_get_latest_evaluation(
     assert data["id"] == 1
     assert data["dataset_name"] == ("rag-evaluation-v1")
     assert data["status"] == "completed"
+    assert data["duration_seconds"] == pytest.approx(12.0)
     assert data["llm_model"] == ("openai/gpt-oss-120b")
     assert data["embedding_model"] == ("all-MiniLM-L6-v2")
     assert data["git_commit"] == "a" * 40
@@ -502,3 +521,125 @@ def test_execute_evaluation_in_background_closes_session_on_failure(
 
     mock_logger.exception.assert_called_once()
     db.close.assert_called_once()
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_run_without_duration(
+    mock_repository,
+):
+    run = make_evaluation_run(
+        run_id=30,
+    )
+
+    run.status = "running"
+    run.started_at = datetime(
+        2026,
+        8,
+        26,
+        10,
+        0,
+        0,
+    )
+    run.completed_at = None
+
+    mock_repository.return_value.get_run.return_value = run
+
+    response = client.get("/api/v1/evaluations/30")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["status"] == "running"
+    assert data["duration_seconds"] is None
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_health(
+    mock_repository,
+):
+    running_run = Mock(
+        status="running",
+        started_at=datetime.now(timezone.utc),
+    )
+
+    mock_repository.return_value.list_running_runs.return_value = [running_run]
+
+    response = client.get("/api/v1/evaluations/health")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["healthy"] is True
+    assert data["running_count"] == 1
+    assert data["stale_count"] == 0
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_health_without_running_runs(
+    mock_repository,
+):
+    mock_repository.return_value.list_running_runs.return_value = []
+
+    response = client.get("/api/v1/evaluations/health")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["healthy"] is True
+    assert data["running_count"] == 0
+    assert data["stale_count"] == 0
+
+
+@patch(
+    "app.api.evaluations.is_evaluation_stale",
+)
+@patch(
+    "app.api.evaluations.EvaluationRepository",
+)
+def test_get_stale_evaluations(
+    mock_repository,
+    mock_is_stale,
+):
+    stale_run = Mock(
+        id=25,
+        dataset_name="rag-evaluation-v1",
+        status="running",
+        started_at=datetime.now(timezone.utc),
+    )
+
+    mock_repository.return_value.list_running_runs.return_value = [stale_run]
+
+    mock_is_stale.return_value = True
+
+    response = client.get("/api/v1/evaluations/stale")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert len(data["runs"]) == 1
+    assert data["runs"][0]["id"] == 25
+    assert data["runs"][0]["status"] == "running"
+    assert data["runs"][0]["dataset_name"] == ("rag-evaluation-v1")
+
+    assert data["runs"][0]["duration_seconds"] >= 0
+
+    mock_is_stale.assert_called_once()
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_stale_evaluations_when_none_exist(
+    mock_repository,
+):
+    mock_repository.return_value.list_running_runs.return_value = []
+
+    response = client.get("/api/v1/evaluations/stale")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["runs"] == []

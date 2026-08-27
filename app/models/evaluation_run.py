@@ -81,3 +81,13 @@ class EvaluationRun(Base):
         nullable=False,
         default="completed",
     )
+
+    started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(),
+        nullable=True,
+    )
+
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(),
+        nullable=True,
+    )

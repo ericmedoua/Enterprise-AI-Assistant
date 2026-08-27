@@ -51,6 +51,30 @@ from app.database.session import (
     SessionLocal,
 )
 from app.core.logger import app_logger
+from app.ai.evaluation.evaluation_duration import (
+    calculate_duration_seconds,
+)
+from app.ai.evaluation.evaluation_health import (
+    evaluate_health,
+)
+
+from app.schemas.evaluation import (
+    EvaluationHealthResponse,
+)
+
+from app.ai.evaluation.evaluation_duration import (
+    calculate_duration_seconds,
+)
+
+from app.ai.evaluation.stale_evaluation import (
+    is_evaluation_stale,
+)
+
+from app.schemas.evaluation import (
+    StaleEvaluationRunResponse,
+    StaleEvaluationRunsResponse,
+)
+from datetime import datetime, timezone
 
 router = APIRouter(
     prefix="/evaluations",
@@ -67,6 +91,12 @@ def _to_response(run):
         embedding_model=run.embedding_model,
         git_commit=run.git_commit,
         status=run.status,
+        started_at=run.started_at,
+        completed_at=run.completed_at,
+        duration_seconds=calculate_duration_seconds(
+            run.started_at,
+            run.completed_at,
+        ),
         total_cases=run.total_cases,
         retrieval_hit_rate=run.retrieval_hit_rate,
         average_groundedness=run.average_groundedness,
@@ -175,6 +205,68 @@ def get_evaluation_dashboard(
     return EvaluationDashboardResponse(
         latest=_to_response(latest),
         comparison=comparison_response,
+    )
+
+
+@router.get(
+    "/health",
+    response_model=EvaluationHealthResponse,
+)
+def get_evaluation_health(
+    db: Session = Depends(get_db),
+):
+    repository = EvaluationRepository(db)
+
+    running_runs = repository.list_running_runs()
+
+    health = evaluate_health(running_runs)
+
+    return EvaluationHealthResponse(
+        healthy=health.healthy,
+        running_count=health.running_count,
+        stale_count=health.stale_count,
+    )
+
+
+@router.get(
+    "/stale",
+    response_model=StaleEvaluationRunsResponse,
+)
+def get_stale_evaluations(
+    db: Session = Depends(get_db),
+):
+    repository = EvaluationRepository(db)
+
+    running_runs = repository.list_running_runs()
+
+    stale_runs = []
+
+    for run in running_runs:
+        if not is_evaluation_stale(
+            status=run.status,
+            started_at=run.started_at,
+        ):
+            continue
+
+        duration = (datetime.now(timezone.utc) - run.started_at).total_seconds()
+
+        # A stale run must have started_at, and its
+        # duration is therefore available up to "now".
+        if duration is None:
+            continue
+
+        stale_runs.append(
+            StaleEvaluationRunResponse(
+                id=run.id,
+                dataset_name=run.dataset_name,
+                status=run.status,
+                started_at=run.started_at,
+                duration_seconds=duration,
+            )
+        )
+
+    return StaleEvaluationRunsResponse(
+        runs=stale_runs,
     )
 
 

@@ -161,7 +161,9 @@ def test_update_status():
 
     run = Mock(
         id=10,
-        status="running",
+        status="queued",
+        started_at=None,
+        completed_at=None,
     )
 
     db.get.return_value = run
@@ -170,11 +172,14 @@ def test_update_status():
 
     result = repository.update_status(
         run_id=10,
-        status="completed",
+        status="running",
     )
 
     assert result is run
-    assert run.status == "completed"
+    assert run.status == "running"
+    assert run.started_at is not None
+    assert run.completed_at is None
+
     db.commit.assert_called_once()
     db.refresh.assert_called_once_with(run)
 
@@ -184,6 +189,9 @@ def test_update_results():
 
     run = Mock(
         id=10,
+        status="running",
+        started_at=None,
+        completed_at=None,
     )
 
     db.get.return_value = run
@@ -203,7 +211,67 @@ def test_update_results():
     )
 
     assert result is run
+
     assert run.total_cases == 2
+    assert run.retrieval_hit_rate == 1.0
     assert run.average_groundedness == 0.95
+    assert run.average_semantic_relevance == 0.60
+    assert run.average_source_count == 1.0
+    assert run.overall_pass_rate == 1.0
     assert run.quality_gate_passed is True
+
     assert run.status == "completed"
+    assert run.completed_at is not None
+
+    db.commit.assert_called_once()
+    db.refresh.assert_called_once_with(run)
+
+
+def test_update_results_failed():
+    db = Mock()
+
+    run = Mock(
+        id=10,
+        status="running",
+        started_at=None,
+        completed_at=None,
+    )
+
+    db.get.return_value = run
+
+    repository = EvaluationRepository(db)
+
+    result = repository.update_results(
+        run_id=10,
+        total_cases=0,
+        retrieval_hit_rate=0.0,
+        average_groundedness=0.0,
+        average_semantic_relevance=0.0,
+        average_source_count=0.0,
+        overall_pass_rate=0.0,
+        quality_gate_passed=False,
+        status="failed",
+    )
+
+    assert result is run
+    assert run.status == "failed"
+    assert run.completed_at is not None
+
+    db.commit.assert_called_once()
+    db.refresh.assert_called_once_with(run)
+
+
+def test_list_running_runs():
+    db = Mock()
+
+    expected = [Mock()]
+
+    (
+        db.query.return_value.filter.return_value.order_by.return_value.all.return_value
+    ) = expected
+
+    repository = EvaluationRepository(db)
+
+    result = repository.list_running_runs()
+
+    assert result is expected

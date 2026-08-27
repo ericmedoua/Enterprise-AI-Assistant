@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -95,6 +96,14 @@ class EvaluationRunner:
         run.overall_pass_rate = overall_pass_rate
         run.quality_gate_passed = quality_gate_passed
         run.status = status
+
+        if status in {
+            EVALUATION_STATUS_COMPLETED,
+            EVALUATION_STATUS_FAILED,
+        }:
+            run.completed_at = datetime.now(
+                timezone.utc
+        )
 
         self.db.commit()
         self.db.refresh(run)

@@ -9,6 +9,13 @@ from app.ai.evaluation.evaluation_report import (
 from app.ai.evaluation.quality_gate import (
     QualityGateResult,
 )
+from datetime import datetime, timezone
+
+from app.core.constants import (
+    EVALUATION_STATUS_COMPLETED,
+    EVALUATION_STATUS_FAILED,
+    EVALUATION_STATUS_RUNNING,
+)
 
 
 class EvaluationRepository:
@@ -186,6 +193,12 @@ class EvaluationRepository:
         run.quality_gate_passed = quality_gate_passed
         run.status = status
 
+        if status in {
+            EVALUATION_STATUS_COMPLETED,
+            EVALUATION_STATUS_FAILED,
+        }:
+            run.completed_at = datetime.now(timezone.utc)
+
         self.db.commit()
         self.db.refresh(run)
 
@@ -204,9 +217,28 @@ class EvaluationRepository:
         if run is None:
             return None
 
+        now = datetime.now(timezone.utc)
+
         run.status = status
+
+        if status == EVALUATION_STATUS_RUNNING:
+            run.started_at = now
+
+        elif status in {
+            EVALUATION_STATUS_COMPLETED,
+            EVALUATION_STATUS_FAILED,
+        }:
+            run.completed_at = now
 
         self.db.commit()
         self.db.refresh(run)
 
         return run
+
+    def list_running_runs(self) -> list[EvaluationRun]:
+        return (
+            self.db.query(EvaluationRun)
+            .filter(EvaluationRun.status == EVALUATION_STATUS_RUNNING)
+            .order_by(EvaluationRun.started_at.asc())
+            .all()
+        )

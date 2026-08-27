@@ -11,7 +11,11 @@ class EvaluationRunResponse(BaseModel):
     llm_model: str
     embedding_model: str
     git_commit: str
+
     status: str
+    started_at: datetime | None
+    completed_at: datetime | None
+    duration_seconds: float | None
 
     total_cases: int
     retrieval_hit_rate: float
@@ -50,3 +54,21 @@ class EvaluationDashboardResponse(BaseModel):
 class EvaluationRunStartResponse(BaseModel):
     evaluation_run_id: int
     status: str
+
+
+class EvaluationHealthResponse(BaseModel):
+    healthy: bool
+    running_count: int
+    stale_count: int
+
+
+class StaleEvaluationRunResponse(BaseModel):
+    id: int
+    dataset_name: str
+    status: str
+    started_at: datetime
+    duration_seconds: float
+
+
+class StaleEvaluationRunsResponse(BaseModel):
+    runs: list[StaleEvaluationRunResponse]

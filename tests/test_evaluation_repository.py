@@ -361,3 +361,94 @@ def test_fail_stale_run_does_not_change_completed_run():
 
     db.commit.assert_not_called()
     db.refresh.assert_not_called()
+
+
+def test_cancel_queued_run():
+    db = Mock()
+
+    run = Mock(
+        id=50,
+        status="queued",
+        completed_at=None,
+    )
+
+    db.get.return_value = run
+
+    repository = EvaluationRepository(db)
+
+    result = repository.cancel_queued_run(
+        run_id=50,
+    )
+
+    assert result is run
+    assert run.status == "cancelled"
+    assert run.completed_at is not None
+
+    db.commit.assert_called_once()
+    db.refresh.assert_called_once_with(run)
+
+
+def test_cancel_queued_run_does_not_cancel_running_run():
+    db = Mock()
+
+    run = Mock(
+        id=51,
+        status="running",
+        completed_at=None,
+    )
+
+    db.get.return_value = run
+
+    repository = EvaluationRepository(db)
+
+    result = repository.cancel_queued_run(
+        run_id=51,
+    )
+
+    assert result is None
+    assert run.status == "running"
+    assert run.completed_at is None
+
+    db.commit.assert_not_called()
+    db.refresh.assert_not_called()
+
+
+def test_cancel_queued_run_does_not_cancel_completed_run():
+    db = Mock()
+
+    run = Mock(
+        id=52,
+        status="completed",
+        completed_at=datetime.now(timezone.utc),
+    )
+
+    db.get.return_value = run
+
+    repository = EvaluationRepository(db)
+
+    result = repository.cancel_queued_run(
+        run_id=52,
+    )
+
+    assert result is None
+    assert run.status == "completed"
+
+    db.commit.assert_not_called()
+    db.refresh.assert_not_called()
+
+
+def test_cancel_queued_run_not_found():
+    db = Mock()
+
+    db.get.return_value = None
+
+    repository = EvaluationRepository(db)
+
+    result = repository.cancel_queued_run(
+        run_id=999,
+    )
+
+    assert result is None
+
+    db.commit.assert_not_called()
+    db.refresh.assert_not_called()

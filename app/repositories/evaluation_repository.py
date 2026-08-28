@@ -12,16 +12,14 @@ from app.ai.evaluation.quality_gate import (
 from datetime import datetime, timezone
 
 from app.core.constants import (
+    EVALUATION_STATUS_CANCELLED,
     EVALUATION_STATUS_COMPLETED,
     EVALUATION_STATUS_FAILED,
+    EVALUATION_STATUS_QUEUED,
     EVALUATION_STATUS_RUNNING,
 )
 from app.ai.evaluation.stale_evaluation import (
     is_evaluation_stale,
-)
-
-from app.core.constants import (
-    EVALUATION_STATUS_FAILED,
 )
 
 
@@ -277,3 +275,33 @@ class EvaluationRepository:
         self.db.refresh(run)
 
         return run
+
+    def cancel_queued_run(
+        self,
+        run_id: int,
+    ) -> EvaluationRun | None:
+        run = self.db.get(
+            EvaluationRun,
+            run_id,
+        )
+
+        if run is None:
+            return None
+
+        if run.status != EVALUATION_STATUS_QUEUED:
+            return None
+
+        run.status = EVALUATION_STATUS_CANCELLED
+        run.completed_at = datetime.now(timezone.utc)
+
+        self.db.commit()
+        self.db.refresh(run)
+
+        return run
+
+    def count_cancelled_runs(self) -> int:
+        return (
+            self.db.query(EvaluationRun)
+            .filter(EvaluationRun.status == EVALUATION_STATUS_CANCELLED)
+            .count()
+        )

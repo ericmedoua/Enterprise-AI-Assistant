@@ -565,6 +565,8 @@ def test_get_evaluation_health(
 
     mock_repository.return_value.list_running_runs.return_value = [running_run]
 
+    mock_repository.return_value.count_cancelled_runs.return_value = 2
+
     response = client.get("/api/v1/evaluations/health")
 
     assert response.status_code == 200
@@ -574,6 +576,7 @@ def test_get_evaluation_health(
     assert data["healthy"] is True
     assert data["running_count"] == 1
     assert data["stale_count"] == 0
+    assert data["cancelled_count"] == 2
 
 
 @patch("app.api.evaluations.EvaluationRepository")
@@ -581,6 +584,7 @@ def test_get_evaluation_health_without_running_runs(
     mock_repository,
 ):
     mock_repository.return_value.list_running_runs.return_value = []
+    mock_repository.return_value.count_cancelled_runs.return_value = 0
 
     response = client.get("/api/v1/evaluations/health")
 
@@ -591,6 +595,7 @@ def test_get_evaluation_health_without_running_runs(
     assert data["healthy"] is True
     assert data["running_count"] == 0
     assert data["stale_count"] == 0
+    assert data["cancelled_count"] == 0
 
 
 @patch(
@@ -712,4 +717,75 @@ def test_fail_stale_evaluation_conflict(
     assert response.json() == {
         "success": False,
         "error": ("Evaluation run is not stale or cannot be remediated."),
+    }
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_cancel_queued_evaluation(
+    mock_repository,
+):
+    queued_run = make_evaluation_run(
+        run_id=60,
+    )
+
+    queued_run.status = "cancelled"
+    queued_run.completed_at = datetime.now()
+
+    mock_repository.return_value.get_run.return_value = queued_run
+
+    mock_repository.return_value.cancel_queued_run.return_value = queued_run
+
+    response = client.post("/api/v1/evaluations/60/cancel")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["id"] == 60
+    assert data["status"] == "cancelled"
+
+    mock_repository.return_value.cancel_queued_run.assert_called_once_with(
+        run_id=60,
+    )
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_cancel_evaluation_not_found(
+    mock_repository,
+):
+    mock_repository.return_value.get_run.return_value = None
+
+    response = client.post("/api/v1/evaluations/9999/cancel")
+
+    assert response.status_code == 404
+
+    assert response.json() == {
+        "success": False,
+        "error": "Evaluation run not found.",
+    }
+
+    mock_repository.return_value.cancel_queued_run.assert_not_called()
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_cancel_running_evaluation(
+    mock_repository,
+):
+    running_run = make_evaluation_run(
+        run_id=61,
+    )
+
+    running_run.status = "running"
+
+    mock_repository.return_value.get_run.return_value = running_run
+
+    mock_repository.return_value.cancel_queued_run.return_value = None
+
+    response = client.post("/api/v1/evaluations/61/cancel")
+
+    assert response.status_code == 409
+
+    assert response.json() == {
+        "success": False,
+        "error": ("Evaluation run cannot be cancelled because it is not queued."),
     }

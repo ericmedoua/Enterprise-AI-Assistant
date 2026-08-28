@@ -10,10 +10,12 @@ class EvaluationHealth:
     healthy: bool
     running_count: int
     stale_count: int
+    cancelled_count: int
 
 
 def evaluate_health(
     runs,
+    cancelled_count: int = 0,
     timeout_seconds: int = 300,
 ) -> EvaluationHealth:
     stale_count = sum(
@@ -30,4 +32,5 @@ def evaluate_health(
         healthy=stale_count == 0,
         running_count=len(runs),
         stale_count=stale_count,
+        cancelled_count=cancelled_count,
     )

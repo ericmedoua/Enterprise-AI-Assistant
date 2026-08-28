@@ -60,6 +60,7 @@ class EvaluationHealthResponse(BaseModel):
     healthy: bool
     running_count: int
     stale_count: int
+    cancelled_count: int
 
 
 class StaleEvaluationRunResponse(BaseModel):

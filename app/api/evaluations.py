@@ -219,12 +219,18 @@ def get_evaluation_health(
 
     running_runs = repository.list_running_runs()
 
-    health = evaluate_health(running_runs)
+    cancelled_count = repository.count_cancelled_runs()
+
+    health = evaluate_health(
+        running_runs,
+        cancelled_count=cancelled_count,
+    )
 
     return EvaluationHealthResponse(
         healthy=health.healthy,
         running_count=health.running_count,
         stale_count=health.stale_count,
+        cancelled_count=health.cancelled_count,
     )
 
 
@@ -299,6 +305,37 @@ def fail_stale_evaluation(
         )
 
     return _to_response(updated_run)
+
+
+@router.post(
+    "/{run_id}/cancel",
+    response_model=EvaluationRunResponse,
+)
+def cancel_evaluation_run(
+    run_id: int,
+    db: Session = Depends(get_db),
+):
+    repository = EvaluationRepository(db)
+
+    run = repository.get_run(run_id)
+
+    if run is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Evaluation run not found.",
+        )
+
+    cancelled_run = repository.cancel_queued_run(
+        run_id=run_id,
+    )
+
+    if cancelled_run is None:
+        raise HTTPException(
+            status_code=409,
+            detail=("Evaluation run cannot be cancelled because it is not queued."),
+        )
+
+    return _to_response(cancelled_run)
 
 
 @router.get(

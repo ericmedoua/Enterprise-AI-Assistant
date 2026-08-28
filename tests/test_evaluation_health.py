@@ -25,6 +25,7 @@ def test_evaluation_health_is_healthy():
     assert result.healthy is True
     assert result.running_count == 1
     assert result.stale_count == 0
+    assert result.cancelled_count == 0
 
 
 def test_evaluation_health_detects_stale_run():
@@ -47,6 +48,7 @@ def test_evaluation_health_detects_stale_run():
     assert result.healthy is False
     assert result.running_count == 1
     assert result.stale_count == 1
+    assert result.cancelled_count == 0
 
 
 def test_evaluation_health_with_no_running_runs():
@@ -58,3 +60,17 @@ def test_evaluation_health_with_no_running_runs():
     assert result.healthy is True
     assert result.running_count == 0
     assert result.stale_count == 0
+    assert result.cancelled_count == 0
+
+
+def test_evaluation_health_reports_cancelled_runs():
+    result = evaluate_health(
+        runs=[],
+        cancelled_count=3,
+        timeout_seconds=300,
+    )
+
+    assert result.healthy is True
+    assert result.running_count == 0
+    assert result.stale_count == 0
+    assert result.cancelled_count == 3

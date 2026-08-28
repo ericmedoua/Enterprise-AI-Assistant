@@ -12,6 +12,12 @@ from app.ai.evaluation.quality_gate import (
     QualityGateResult,
 )
 
+from datetime import (
+    datetime,
+    timedelta,
+    timezone,
+)
+
 
 def test_create_run():
     db = Mock()
@@ -275,3 +281,83 @@ def test_list_running_runs():
     result = repository.list_running_runs()
 
     assert result is expected
+
+
+def test_fail_stale_run():
+    db = Mock()
+
+    run = Mock(
+        id=25,
+        status="running",
+        started_at=(datetime.now(timezone.utc) - timedelta(hours=1)),
+        completed_at=None,
+    )
+
+    db.get.return_value = run
+
+    repository = EvaluationRepository(db)
+
+    result = repository.fail_stale_run(
+        run_id=25,
+        timeout_seconds=300,
+    )
+
+    assert result is run
+    assert run.status == "failed"
+    assert run.completed_at is not None
+
+    db.commit.assert_called_once()
+    db.refresh.assert_called_once_with(run)
+
+
+def test_fail_stale_run_does_not_fail_recent_run():
+    db = Mock()
+
+    run = Mock(
+        id=26,
+        status="running",
+        started_at=datetime.now(timezone.utc),
+        completed_at=None,
+    )
+
+    db.get.return_value = run
+
+    repository = EvaluationRepository(db)
+
+    result = repository.fail_stale_run(
+        run_id=26,
+        timeout_seconds=300,
+    )
+
+    assert result is None
+    assert run.status == "running"
+    assert run.completed_at is None
+
+    db.commit.assert_not_called()
+    db.refresh.assert_not_called()
+
+
+def test_fail_stale_run_does_not_change_completed_run():
+    db = Mock()
+
+    run = Mock(
+        id=27,
+        status="completed",
+        started_at=(datetime.now(timezone.utc) - timedelta(hours=1)),
+        completed_at=(datetime.now(timezone.utc)),
+    )
+
+    db.get.return_value = run
+
+    repository = EvaluationRepository(db)
+
+    result = repository.fail_stale_run(
+        run_id=27,
+        timeout_seconds=300,
+    )
+
+    assert result is None
+    assert run.status == "completed"
+
+    db.commit.assert_not_called()
+    db.refresh.assert_not_called()

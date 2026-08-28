@@ -643,3 +643,73 @@ def test_get_stale_evaluations_when_none_exist(
     data = response.json()
 
     assert data["runs"] == []
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_fail_stale_evaluation(
+    mock_repository,
+):
+    stale_run = make_evaluation_run(
+        run_id=25,
+    )
+
+    stale_run.status = "failed"
+
+    mock_repository.return_value.get_run.return_value = stale_run
+
+    mock_repository.return_value.fail_stale_run.return_value = stale_run
+
+    response = client.post("/api/v1/evaluations/25/fail")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["id"] == 25
+    assert data["status"] == "failed"
+
+    mock_repository.return_value.fail_stale_run.assert_called_once_with(
+        run_id=25,
+    )
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_fail_stale_evaluation_not_found(
+    mock_repository,
+):
+    mock_repository.return_value.get_run.return_value = None
+
+    response = client.post("/api/v1/evaluations/999/fail")
+
+    assert response.status_code == 404
+
+    assert response.json() == {
+        "success": False,
+        "error": "Evaluation run not found.",
+    }
+
+    mock_repository.return_value.fail_stale_run.assert_not_called()
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_fail_stale_evaluation_conflict(
+    mock_repository,
+):
+    current_run = make_evaluation_run(
+        run_id=30,
+    )
+
+    current_run.status = "running"
+
+    mock_repository.return_value.get_run.return_value = current_run
+
+    mock_repository.return_value.fail_stale_run.return_value = None
+
+    response = client.post("/api/v1/evaluations/30/fail")
+
+    assert response.status_code == 409
+
+    assert response.json() == {
+        "success": False,
+        "error": ("Evaluation run is not stale or cannot be remediated."),
+    }

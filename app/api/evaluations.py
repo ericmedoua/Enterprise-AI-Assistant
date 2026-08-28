@@ -270,6 +270,37 @@ def get_stale_evaluations(
     )
 
 
+@router.post(
+    "/{run_id}/fail",
+    response_model=EvaluationRunResponse,
+)
+def fail_stale_evaluation(
+    run_id: int,
+    db: Session = Depends(get_db),
+):
+    repository = EvaluationRepository(db)
+
+    run = repository.get_run(run_id)
+
+    if run is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Evaluation run not found.",
+        )
+
+    updated_run = repository.fail_stale_run(
+        run_id=run_id,
+    )
+
+    if updated_run is None:
+        raise HTTPException(
+            status_code=409,
+            detail=("Evaluation run is not stale or cannot be remediated."),
+        )
+
+    return _to_response(updated_run)
+
+
 @router.get(
     "/{run_id}",
     response_model=EvaluationRunResponse,

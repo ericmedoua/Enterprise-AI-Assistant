@@ -16,6 +16,13 @@ from app.core.constants import (
     EVALUATION_STATUS_FAILED,
     EVALUATION_STATUS_RUNNING,
 )
+from app.ai.evaluation.stale_evaluation import (
+    is_evaluation_stale,
+)
+
+from app.core.constants import (
+    EVALUATION_STATUS_FAILED,
+)
 
 
 class EvaluationRepository:
@@ -242,3 +249,31 @@ class EvaluationRepository:
             .order_by(EvaluationRun.started_at.asc())
             .all()
         )
+
+    def fail_stale_run(
+        self,
+        run_id: int,
+        timeout_seconds: int = 300,
+    ) -> EvaluationRun | None:
+        run = self.db.get(
+            EvaluationRun,
+            run_id,
+        )
+
+        if run is None:
+            return None
+
+        if not is_evaluation_stale(
+            status=run.status,
+            started_at=run.started_at,
+            timeout_seconds=timeout_seconds,
+        ):
+            return None
+
+        run.status = EVALUATION_STATUS_FAILED
+        run.completed_at = datetime.now(timezone.utc)
+
+        self.db.commit()
+        self.db.refresh(run)
+
+        return run

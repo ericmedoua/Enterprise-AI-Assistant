@@ -37,6 +37,9 @@ class Settings(BaseSettings):
         case_sensitive=False,  # Allows case-insensitive matching
     )
 
+    evaluation_scheduler_enabled: bool = False
+    evaluation_scheduler_interval_seconds: int = 300
+
     @property
     def CHROMA_PATH(self) -> str:
         """Alias for backwards compatibility with uppercase access."""

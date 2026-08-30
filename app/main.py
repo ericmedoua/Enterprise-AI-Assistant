@@ -21,6 +21,12 @@ from app.middleware.security_headers import SecurityHeadersMiddleware
 import signal
 import os
 
+import asyncio
+
+from app.ai.evaluation.evaluation_scheduler import (
+    run_remediation_scheduler,
+)
+
 app = FastAPI(
     title=settings.APP_NAME,
     version="1.0.0",
@@ -59,6 +65,17 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup():
     app_logger.info("Application Started")
+
+    if settings.evaluation_scheduler_enabled:
+        asyncio.create_task(
+            run_remediation_scheduler(
+                interval_seconds=(settings.evaluation_scheduler_interval_seconds)
+            )
+        )
+
+        app_logger.info("Evaluation remediation scheduler enabled.")
+    else:
+        app_logger.info("Evaluation remediation scheduler disabled.")
 
 
 @app.get("/")

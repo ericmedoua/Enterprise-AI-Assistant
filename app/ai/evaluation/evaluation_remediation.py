@@ -5,6 +5,10 @@ from app.repositories.evaluation_repository import (
     EvaluationRepository,
 )
 
+from app.ai.evaluation.evaluation_events import (
+    log_evaluation_remediated,
+)
+
 
 def remediate_stale_evaluations(
     repository: EvaluationRepository,
@@ -36,6 +40,10 @@ def remediate_stale_evaluations(
         )
 
         if updated_run is not None:
+            log_evaluation_remediated(
+                run_id=run.id,
+            )
+
             remediated_ids.append(run.id)
 
     return remediated_ids

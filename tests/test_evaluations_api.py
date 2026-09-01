@@ -789,3 +789,68 @@ def test_cancel_running_evaluation(
         "success": False,
         "error": ("Evaluation run cannot be cancelled because it is not queued."),
     }
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_latest_evaluation_observability(
+    mock_repository,
+):
+    run = make_evaluation_run(
+        run_id=408,
+    )
+
+    run.status = "completed"
+
+    run.started_at = datetime(
+        2026,
+        8,
+        30,
+        13,
+        0,
+        0,
+    )
+
+    run.completed_at = datetime(
+        2026,
+        8,
+        30,
+        13,
+        0,
+        10,
+    )
+
+    mock_repository.return_value.get_latest_run.return_value = run
+
+    response = client.get("/api/v1/evaluations/observability/latest")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["event"] == ("rag_evaluation_completed")
+    assert data["dataset"] == ("rag-evaluation-v1")
+    assert data["total_cases"] == 2
+    assert data["retrieval_hit_rate"] == 1.0
+    assert data["average_groundedness"] == 1.0
+    assert data["average_semantic_relevance"] == 0.60
+    assert data["average_source_count"] == 1.0
+    assert data["overall_pass_rate"] == 1.0
+    assert data["quality_gate_passed"] is True
+    assert data["status"] == "completed"
+    assert data["duration_seconds"] == pytest.approx(10.0)
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_latest_evaluation_observability_when_none_exist(
+    mock_repository,
+):
+    mock_repository.return_value.get_latest_run.return_value = None
+
+    response = client.get("/api/v1/evaluations/observability/latest")
+
+    assert response.status_code == 404
+
+    data = response.json()
+
+    assert data["success"] is False
+    assert data["error"] == ("No evaluation runs found.")

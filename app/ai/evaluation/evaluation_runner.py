@@ -36,6 +36,23 @@ from app.models.evaluation_run import (
     EvaluationRun,
 )
 
+from app.ai.evaluation.evaluation_events import (
+    log_evaluation_created,
+    log_evaluation_started,
+    log_evaluation_completed,
+    log_evaluation_failed,
+)
+
+from app.ai.evaluation.evaluation_duration import (
+    calculate_duration_seconds,
+)
+
+from app.ai.evaluation.evaluation_observability import (
+    build_evaluation_event,
+    evaluation_event_payload,
+)
+from app.core.logger import app_logger
+
 
 @dataclass(frozen=True)
 class EvaluationRunResult:
@@ -58,15 +75,12 @@ class EvaluationRunner:
         dataset_name: str = "rag-evaluation-v1",
     ) -> EvaluationRunResult:
 
-        evaluation_run = self.create_run(
-        dataset_name
-    )
+        evaluation_run = self.create_run(dataset_name)
 
         return self.execute_run(
-        evaluation_run.id,
-        dataset_name,
-    )
-
+            evaluation_run.id,
+            dataset_name,
+        )
 
     def update_results(
         self,
@@ -101,9 +115,7 @@ class EvaluationRunner:
             EVALUATION_STATUS_COMPLETED,
             EVALUATION_STATUS_FAILED,
         }:
-            run.completed_at = datetime.now(
-                timezone.utc
-        )
+            run.completed_at = datetime.now(timezone.utc)
 
         self.db.commit()
         self.db.refresh(run)
@@ -114,7 +126,7 @@ class EvaluationRunner:
         self,
         dataset_name: str = "rag-evaluation-v1",
     ):
-        return self.repository.create_run(
+        evaluation_run = self.repository.create_run(
             dataset_name=dataset_name,
             llm_model=self.metadata.llm_model,
             embedding_model=self.metadata.embedding_model,
@@ -129,6 +141,13 @@ class EvaluationRunner:
             status=EVALUATION_STATUS_QUEUED,
         )
 
+        log_evaluation_created(
+            run_id=evaluation_run.id,
+            dataset_name=dataset_name,
+        )
+
+        return evaluation_run
+
     def execute_run(
         self,
         evaluation_run_id: int,
@@ -141,47 +160,46 @@ class EvaluationRunner:
         )
 
         if updated_run is None:
-            raise RuntimeError(
-                "Evaluation run not found."
-            )
+            raise RuntimeError("Evaluation run not found.")
+
+        log_evaluation_started(
+            run_id=evaluation_run_id,
+        )
 
         try:
-            report = run_rag_evaluation_report(
-                RAG_EVALUATION_DATASET
-            )
+            report = run_rag_evaluation_report(RAG_EVALUATION_DATASET)
 
-            quality_gate = evaluate_quality_gate(
-                report
-            )
+            quality_gate = evaluate_quality_gate(report)
 
             completed_run = self.repository.update_results(
                 run_id=evaluation_run_id,
                 total_cases=report.total_cases,
-                retrieval_hit_rate=(
-                    report.retrieval_hit_rate
-                ),
-                average_groundedness=(
-                    report.average_groundedness
-                ),
-                average_semantic_relevance=(
-                    report.average_semantic_relevance
-                ),
-                average_source_count=(
-                    report.average_source_count
-                ),
-                overall_pass_rate=(
-                    report.overall_pass_rate
-                ),
-                quality_gate_passed=(
-                    quality_gate.passed
-                ),
+                retrieval_hit_rate=report.retrieval_hit_rate,
+                average_groundedness=report.average_groundedness,
+                average_semantic_relevance=(report.average_semantic_relevance),
+                average_source_count=report.average_source_count,
+                overall_pass_rate=report.overall_pass_rate,
+                quality_gate_passed=quality_gate.passed,
                 status=EVALUATION_STATUS_COMPLETED,
             )
 
             if completed_run is None:
-                raise RuntimeError(
-                    "Evaluation run disappeared during execution."
-                )
+                raise RuntimeError("Evaluation run disappeared during execution.")
+
+            duration_seconds = calculate_duration_seconds(
+                completed_run.started_at,
+                completed_run.completed_at,
+            )
+
+            log_evaluation_completed(
+                run_id=completed_run.id,
+                duration_seconds=duration_seconds,
+                retrieval_hit_rate=report.retrieval_hit_rate,
+                groundedness=report.average_groundedness,
+                semantic_relevance=(report.average_semantic_relevance),
+                overall_pass_rate=report.overall_pass_rate,
+                quality_gate_passed=quality_gate.passed,
+            )
 
             snapshot = build_evaluation_snapshot(
                 repository=self.repository,
@@ -190,6 +208,12 @@ class EvaluationRunner:
                 quality_gate=quality_gate,
                 current_run_id=completed_run.id,
             )
+
+            observability_event = build_evaluation_event(snapshot)
+
+            observability_payload = evaluation_event_payload(observability_event)
+
+            app_logger.info(f"Evaluation observability event: {observability_payload}")
 
             return EvaluationRunResult(
                 snapshot=snapshot,
@@ -200,5 +224,9 @@ class EvaluationRunner:
             self.repository.update_status(
                 evaluation_run_id,
                 EVALUATION_STATUS_FAILED,
+            )
+
+            log_evaluation_failed(
+                run_id=evaluation_run_id,
             )
             raise

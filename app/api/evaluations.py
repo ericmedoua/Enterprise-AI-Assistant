@@ -9,6 +9,7 @@ from app.repositories.evaluation_repository import (
 
 from app.schemas.evaluation import (
     EvaluationHistoryResponse,
+    EvaluationObservabilityResponse,
     EvaluationRunResponse,
     EvaluationSnapshotResponse,
 )
@@ -79,6 +80,10 @@ from datetime import datetime, timezone
 router = APIRouter(
     prefix="/evaluations",
     tags=["Evaluations"],
+)
+
+from app.ai.evaluation.evaluation_duration import (
+    calculate_duration_seconds,
 )
 
 
@@ -273,6 +278,43 @@ def get_stale_evaluations(
 
     return StaleEvaluationRunsResponse(
         runs=stale_runs,
+    )
+
+
+@router.get(
+    "/observability/latest",
+    response_model=EvaluationObservabilityResponse,
+)
+def get_latest_evaluation_observability(
+    db: Session = Depends(get_db),
+):
+    repository = EvaluationRepository(db)
+
+    run = repository.get_latest_run()
+
+    if run is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No evaluation runs found.",
+        )
+
+    return EvaluationObservabilityResponse(
+        event="rag_evaluation_completed",
+        dataset=run.dataset_name,
+        total_cases=run.total_cases,
+        retrieval_hit_rate=run.retrieval_hit_rate,
+        average_groundedness=run.average_groundedness,
+        average_semantic_relevance=(run.average_semantic_relevance),
+        average_source_count=run.average_source_count,
+        overall_pass_rate=run.overall_pass_rate,
+        quality_gate_passed=run.quality_gate_passed,
+        status=run.status,
+        started_at=run.started_at,
+        completed_at=run.completed_at,
+        duration_seconds=calculate_duration_seconds(
+            run.started_at,
+            run.completed_at,
+        ),
     )
 
 

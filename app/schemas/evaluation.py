@@ -73,3 +73,19 @@ class StaleEvaluationRunResponse(BaseModel):
 
 class StaleEvaluationRunsResponse(BaseModel):
     runs: list[StaleEvaluationRunResponse]
+
+
+class EvaluationObservabilityResponse(BaseModel):
+    event: str
+    dataset: str
+    total_cases: int
+    retrieval_hit_rate: float
+    average_groundedness: float
+    average_semantic_relevance: float
+    average_source_count: float
+    overall_pass_rate: float
+    quality_gate_passed: bool
+    status: str
+    started_at: datetime | None
+    completed_at: datetime | None
+    duration_seconds: float | None

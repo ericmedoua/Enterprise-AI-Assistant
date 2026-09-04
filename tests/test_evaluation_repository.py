@@ -4,6 +4,10 @@ from app.repositories.evaluation_repository import (
     EvaluationRepository,
 )
 
+from app.models.evaluation_run import (
+    EvaluationRun,
+)
+
 from app.ai.evaluation.evaluation_report import (
     EvaluationReport,
 )
@@ -71,7 +75,7 @@ def test_create_from_evaluation():
         overall_passed=True,
     )
 
-    result = repository.create_from_evaluation(
+    result = repository.create_run_from_report(
         dataset_name="rag-evaluation-v1",
         llm_model="openai/gpt-oss-120b",
         embedding_model="all-MiniLM-L6-v2",
@@ -79,6 +83,8 @@ def test_create_from_evaluation():
         report=report,
         quality_gate=quality_gate,
     )
+
+    assert result is not None
 
     assert result.dataset_name == ("rag-evaluation-v1")
 
@@ -452,3 +458,100 @@ def test_cancel_queued_run_not_found():
 
     db.commit.assert_not_called()
     db.refresh.assert_not_called()
+
+
+def test_list_runs_with_limit():
+    db = Mock()
+
+    query = db.query.return_value
+    ordered_query = query.order_by.return_value
+    limited_query = ordered_query.limit.return_value
+
+    runs = [
+        Mock(id=3),
+        Mock(id=2),
+    ]
+
+    limited_query.all.return_value = runs
+
+    repository = EvaluationRepository(db)
+
+    result = repository.list_runs(limit=2)
+
+    assert result == runs
+
+    db.query.assert_called_once_with(EvaluationRun)
+
+    query.order_by.assert_called_once()
+
+    order_by_args = query.order_by.call_args.args
+
+    assert len(order_by_args) == 2
+    assert str(order_by_args[0]) == str(
+        EvaluationRun.created_at.desc()
+    )
+    assert str(order_by_args[1]) == str(
+        EvaluationRun.id.desc()
+    )
+
+    ordered_query.limit.assert_called_once_with(2)
+
+    limited_query.all.assert_called_once()
+
+
+def test_list_runs_without_limit():
+    db = Mock()
+
+    query = db.query.return_value
+    ordered_query = query.order_by.return_value
+
+    runs = [
+        Mock(id=3),
+        Mock(id=2),
+        Mock(id=1),
+    ]
+
+    ordered_query.all.return_value = runs
+
+    repository = EvaluationRepository(db)
+
+    result = repository.list_runs()
+
+    assert result == runs
+
+    db.query.assert_called_once_with(EvaluationRun)
+
+    query.order_by.assert_called_once()
+
+    order_by_args = query.order_by.call_args.args
+
+    assert len(order_by_args) == 2
+    assert str(order_by_args[0]) == str(
+        EvaluationRun.created_at.desc()
+    )
+    assert str(order_by_args[1]) == str(
+        EvaluationRun.id.desc()
+    )
+
+    ordered_query.all.assert_called_once()
+
+    ordered_query.limit.assert_not_called()
+
+
+def test_list_runs_with_zero_limit():
+    db = Mock()
+
+    query = db.query.return_value
+    ordered_query = query.order_by.return_value
+    limited_query = ordered_query.limit.return_value
+
+    limited_query.all.return_value = []
+
+    repository = EvaluationRepository(db)
+
+    result = repository.list_runs(limit=0)
+
+    assert result == []
+
+    ordered_query.limit.assert_called_once_with(0)
+    limited_query.all.assert_called_once()

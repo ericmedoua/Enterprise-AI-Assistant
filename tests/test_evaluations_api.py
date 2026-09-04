@@ -293,25 +293,43 @@ def test_get_evaluation_snapshot_without_history(
     assert data["comparison"] is None
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.api.evaluations.build_evaluation_dashboard")
 def test_get_evaluation_dashboard(
-    mock_repository,
+    mock_build_dashboard,
 ):
-    previous = make_evaluation_run(
-        run_id=1,
-    )
-
     latest = make_evaluation_run(
         run_id=2,
     )
 
-    latest.average_groundedness = 0.75
-    latest.average_semantic_relevance = 0.65
-    latest.overall_pass_rate = 0.50
+    comparison = Mock(
+        retrieval_hit_rate_delta=0.0,
+        groundedness_delta=-0.25,
+        semantic_relevance_delta=0.05,
+        source_count_delta=0.0,
+        overall_pass_rate_delta=-0.5,
+    )
 
-    mock_repository.return_value.get_latest_run.return_value = latest
+    quality_health = Mock(
+        healthy=False,
+        status="degraded",
+        latest_run_id=2,
+        quality_gate_passed=False,
+        trend_status="declining",
+    )
 
-    mock_repository.return_value.get_previous_run.return_value = previous
+    operational_health = Mock(
+        healthy=True,
+        running_count=0,
+        stale_count=0,
+        cancelled_count=0,
+    )
+
+    mock_build_dashboard.return_value = Mock(
+        latest=latest,
+        comparison=comparison,
+        quality_health=quality_health,
+        operational_health=operational_health,
+    )
 
     response = client.get("/api/v1/evaluations/dashboard")
 
@@ -320,35 +338,41 @@ def test_get_evaluation_dashboard(
     data = response.json()
 
     assert data["latest"]["id"] == 2
-    assert data["latest"]["dataset_name"] == "rag-evaluation-v1"
 
     assert data["comparison"] is not None
-
     assert data["comparison"]["groundedness_delta"] == pytest.approx(-0.25)
-
     assert data["comparison"]["semantic_relevance_delta"] == pytest.approx(0.05)
 
+    assert data["quality_health"]["healthy"] is False
+    assert data["quality_health"]["status"] == "degraded"
+    assert data["quality_health"]["latest_run_id"] == 2
+    assert data["quality_health"]["quality_gate_passed"] is False
+    assert data["quality_health"]["trend_status"] == "declining"
 
-@patch("app.api.evaluations.EvaluationRepository")
+    assert data["operational_health"]["healthy"] is True
+    assert data["operational_health"]["running_count"] == 0
+    assert data["operational_health"]["stale_count"] == 0
+    assert data["operational_health"]["cancelled_count"] == 0
+
+    mock_build_dashboard.assert_called_once()
+
+
+@patch("app.api.evaluations.build_evaluation_dashboard")
 def test_get_evaluation_dashboard_without_history(
-    mock_repository,
+    mock_build_dashboard,
 ):
-    latest = make_evaluation_run(
-        run_id=10,
-    )
-
-    mock_repository.return_value.get_latest_run.return_value = latest
-
-    mock_repository.return_value.get_previous_run.return_value = None
+    mock_build_dashboard.side_effect = ValueError("No evaluation runs found.")
 
     response = client.get("/api/v1/evaluations/dashboard")
 
-    assert response.status_code == 200
+    assert response.status_code == 404
 
     data = response.json()
 
-    assert data["latest"]["id"] == 10
-    assert data["comparison"] is None
+    assert data["success"] is False
+    assert data["error"] == "No evaluation runs found."
+
+    mock_build_dashboard.assert_called_once()
 
 
 @patch("app.api.evaluations.get_evaluation_metadata")
@@ -854,3 +878,479 @@ def test_get_latest_evaluation_observability_when_none_exist(
 
     assert data["success"] is False
     assert data["error"] == ("No evaluation runs found.")
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_observability_history(
+    mock_repository,
+):
+    runs = [
+        make_evaluation_run(
+            run_id=2,
+        ),
+        make_evaluation_run(
+            run_id=1,
+        ),
+    ]
+
+    mock_repository.return_value.list_runs.return_value = runs
+
+    response = client.get("/api/v1/evaluations/observability/history")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert "runs" in data
+    assert len(data["runs"]) == 2
+
+    assert data["runs"][0]["id"] == 2
+    assert data["runs"][1]["id"] == 1
+
+    assert data["runs"][0]["dataset_name"] == "rag-evaluation-v1"
+
+    assert data["runs"][0]["duration_seconds"] is not None
+
+    mock_repository.return_value.list_runs.assert_called_once()
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_observability_history_empty(
+    mock_repository,
+):
+    mock_repository.return_value.list_runs.return_value = []
+
+    response = client.get("/api/v1/evaluations/observability/history")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["runs"] == []
+
+    mock_repository.return_value.list_runs.assert_called_once()
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_trends(mock_repository):
+    previous = Mock(
+        id=1,
+        retrieval_hit_rate=0.8,
+        average_groundedness=0.8,
+        average_semantic_relevance=0.7,
+        average_source_count=1.0,
+        overall_pass_rate=0.5,
+    )
+
+    current = Mock(
+        id=2,
+        retrieval_hit_rate=1.0,
+        average_groundedness=0.9,
+        average_semantic_relevance=0.8,
+        average_source_count=2.0,
+        overall_pass_rate=1.0,
+    )
+
+    mock_repository.return_value.list_runs.return_value = [
+        current,
+        previous,
+    ]
+
+    response = client.get("/api/v1/evaluations/trends")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert "trends" in data
+    assert len(data["trends"]) == 5
+
+    assert data["trends"][0]["metric_name"] == ("retrieval_hit_rate")
+    assert data["trends"][0]["previous_value"] == 0.8
+    assert data["trends"][0]["current_value"] == 1.0
+    assert data["trends"][0]["delta"] == pytest.approx(0.2)
+    assert data["trends"][0]["direction"] == "improving"
+
+    assert data["trends"][1]["metric_name"] == ("average_groundedness")
+    assert data["trends"][1]["direction"] == "improving"
+
+    assert data["trends"][2]["metric_name"] == ("average_semantic_relevance")
+    assert data["trends"][2]["direction"] == "improving"
+
+    assert data["trends"][3]["metric_name"] == ("average_source_count")
+    assert data["trends"][3]["direction"] == "improving"
+
+    assert data["trends"][4]["metric_name"] == ("overall_pass_rate")
+    assert data["trends"][4]["direction"] == "improving"
+
+    mock_repository.return_value.list_runs.assert_called_once()
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_trends_with_insufficient_history(
+    mock_repository,
+):
+    mock_repository.return_value.list_runs.return_value = [
+        make_evaluation_run(run_id=1),
+    ]
+
+    response = client.get("/api/v1/evaluations/trends")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["trends"] == []
+
+    mock_repository.return_value.list_runs.assert_called_once()
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_trends_stable(mock_repository):
+    previous = Mock(
+        id=1,
+        retrieval_hit_rate=0.8000,
+        average_groundedness=0.9000,
+        average_semantic_relevance=0.7000,
+        average_source_count=1.0000,
+        overall_pass_rate=0.8000,
+    )
+
+    current = Mock(
+        id=2,
+        retrieval_hit_rate=0.8005,
+        average_groundedness=0.9005,
+        average_semantic_relevance=0.7005,
+        average_source_count=1.0005,
+        overall_pass_rate=0.8005,
+    )
+
+    mock_repository.return_value.list_runs.return_value = [
+        current,
+        previous,
+    ]
+
+    response = client.get("/api/v1/evaluations/trends")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert len(data["trends"]) == 5
+
+    assert all(trend["direction"] == "stable" for trend in data["trends"])
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_trends_declining(mock_repository):
+    previous = Mock(
+        id=1,
+        retrieval_hit_rate=1.0,
+        average_groundedness=1.0,
+        average_semantic_relevance=0.9,
+        average_source_count=2.0,
+        overall_pass_rate=1.0,
+    )
+
+    current = Mock(
+        id=2,
+        retrieval_hit_rate=0.8,
+        average_groundedness=0.7,
+        average_semantic_relevance=0.6,
+        average_source_count=1.0,
+        overall_pass_rate=0.5,
+    )
+
+    mock_repository.return_value.list_runs.return_value = [
+        current,
+        previous,
+    ]
+
+    response = client.get("/api/v1/evaluations/trends")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert len(data["trends"]) == 5
+
+    assert all(trend["direction"] == "declining" for trend in data["trends"])
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_trends_empty_history(mock_repository):
+    mock_repository.return_value.list_runs.return_value = []
+
+    response = client.get("/api/v1/evaluations/trends")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["trends"] == []
+
+    mock_repository.return_value.list_runs.assert_called_once()
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_historical_trends(mock_repository):
+    older = Mock(
+        id=1,
+        created_at=datetime(
+            2026,
+            8,
+            1,
+            tzinfo=timezone.utc,
+        ),
+        retrieval_hit_rate=0.8,
+        average_groundedness=0.8,
+        average_semantic_relevance=0.7,
+        average_source_count=1.0,
+        overall_pass_rate=0.5,
+    )
+
+    newer = Mock(
+        id=2,
+        created_at=datetime(
+            2026,
+            8,
+            2,
+            tzinfo=timezone.utc,
+        ),
+        retrieval_hit_rate=1.0,
+        average_groundedness=0.9,
+        average_semantic_relevance=0.8,
+        average_source_count=2.0,
+        overall_pass_rate=1.0,
+    )
+
+    mock_repository.return_value.list_runs.return_value = [
+        newer,
+        older,
+    ]
+
+    response = client.get("/api/v1/evaluations/historical-trends")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert "trends" in data
+    assert len(data["trends"]) == 5
+
+    retrieval = data["trends"][0]
+
+    assert retrieval["metric_name"] == ("retrieval_hit_rate")
+    assert retrieval["direction"] == "improving"
+
+    assert len(retrieval["points"]) == 2
+
+    assert retrieval["points"][0]["run_id"] == 1
+    assert retrieval["points"][0]["value"] == 0.8
+
+    assert retrieval["points"][1]["run_id"] == 2
+    assert retrieval["points"][1]["value"] == 1.0
+
+    mock_repository.return_value.list_runs.assert_called_once()
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_historical_trends_empty(
+    mock_repository,
+):
+    mock_repository.return_value.list_runs.return_value = []
+
+    response = client.get("/api/v1/evaluations/historical-trends")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert len(data["trends"]) == 5
+
+    assert all(trend["points"] == [] for trend in data["trends"])
+
+    assert all(trend["direction"] == "stable" for trend in data["trends"])
+
+    mock_repository.return_value.list_runs.assert_called_once()
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_historical_trends_with_limit(
+    mock_repository,
+):
+    mock_repository.return_value.list_runs.return_value = []
+
+    response = client.get("/api/v1/evaluations/historical-trends?limit=10")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert len(data["trends"]) == 5
+
+    mock_repository.return_value.list_runs.assert_called_once_with(
+        limit=10,
+    )
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_historical_trends_invalid_limit(
+    mock_repository,
+):
+    response = client.get("/api/v1/evaluations/historical-trends?limit=0")
+
+    assert response.status_code == 422
+
+    mock_repository.return_value.list_runs.assert_not_called()
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_historical_trends_negative_limit(
+    mock_repository,
+):
+    response = client.get("/api/v1/evaluations/historical-trends?limit=-5")
+
+    assert response.status_code == 422
+
+    mock_repository.return_value.list_runs.assert_not_called()
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.api.evaluations.build_evaluation_quality_health")
+def test_get_evaluation_quality_health(
+    mock_build_health,
+    mock_repository,
+):
+    mock_build_health.return_value = Mock(
+        healthy=True,
+        status="healthy",
+        latest_run_id=100,
+        quality_gate_passed=True,
+        trend_status="stable",
+    )
+
+    response = client.get("/api/v1/evaluations/quality-health")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["healthy"] is True
+    assert data["status"] == "healthy"
+    assert data["latest_run_id"] == 100
+    assert data["quality_gate_passed"] is True
+    assert data["trend_status"] == "stable"
+
+    mock_build_health.assert_called_once()
+
+    mock_repository.assert_called_once()
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_quality_health_no_runs(
+    mock_repository,
+):
+    mock_repository.return_value.get_latest_run.return_value = None
+
+    response = client.get("/api/v1/evaluations/quality-health")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["healthy"] is False
+    assert data["status"] == "unhealthy"
+    assert data["latest_run_id"] is None
+    assert data["quality_gate_passed"] is False
+    assert data["trend_status"] == "stable"
+
+    mock_repository.return_value.get_latest_run.assert_called_once()
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.api.evaluations.build_evaluation_quality_health")
+def test_get_evaluation_quality_health_quality_gate_failed(
+    mock_build_health,
+    mock_repository,
+):
+    mock_build_health.return_value = Mock(
+        healthy=False,
+        status="degraded",
+        latest_run_id=100,
+        quality_gate_passed=False,
+        trend_status="stable",
+    )
+
+    response = client.get("/api/v1/evaluations/quality-health")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["healthy"] is False
+    assert data["status"] == "degraded"
+    assert data["latest_run_id"] == 100
+    assert data["quality_gate_passed"] is False
+    assert data["trend_status"] == "stable"
+
+    mock_build_health.assert_called_once()
+
+    mock_repository.assert_called_once()
+
+
+@patch("app.api.evaluations.build_evaluation_dashboard")
+def test_get_evaluation_dashboard_with_operational_degradation(
+    mock_build_dashboard,
+):
+    latest = make_evaluation_run(
+        run_id=20,
+    )
+
+    comparison = Mock(
+        retrieval_hit_rate_delta=0.0,
+        groundedness_delta=0.0,
+        semantic_relevance_delta=0.0,
+        source_count_delta=0.0,
+        overall_pass_rate_delta=0.0,
+    )
+
+    quality_health = Mock(
+        healthy=True,
+        status="healthy",
+        latest_run_id=20,
+        quality_gate_passed=True,
+        trend_status="stable",
+    )
+
+    operational_health = Mock(
+        healthy=False,
+        running_count=2,
+        stale_count=1,
+        cancelled_count=3,
+    )
+
+    mock_build_dashboard.return_value = Mock(
+        latest=latest,
+        comparison=comparison,
+        quality_health=quality_health,
+        operational_health=operational_health,
+    )
+
+    response = client.get("/api/v1/evaluations/dashboard")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["latest"]["id"] == 20
+
+    assert data["quality_health"]["healthy"] is True
+    assert data["quality_health"]["status"] == "healthy"
+
+    assert data["operational_health"]["healthy"] is False
+    assert data["operational_health"]["running_count"] == 2
+    assert data["operational_health"]["stale_count"] == 1
+    assert data["operational_health"]["cancelled_count"] == 3
+
+    mock_build_dashboard.assert_called_once()

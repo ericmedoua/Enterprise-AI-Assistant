@@ -24,7 +24,7 @@ def persist_evaluation(
 ):
     repository = EvaluationRepository(db)
 
-    return repository.create_from_evaluation(
+    return repository.create_run_from_report(
         dataset_name=dataset_name,
         llm_model=llm_model,
         embedding_model=embedding_model,

@@ -46,21 +46,31 @@ class EvaluationSnapshotResponse(BaseModel):
     comparison: dict | None
 
 
-class EvaluationDashboardResponse(BaseModel):
-    latest: EvaluationRunResponse
-    comparison: EvaluationComparisonResponse | None
-
-
-class EvaluationRunStartResponse(BaseModel):
-    evaluation_run_id: int
-    status: str
-
-
 class EvaluationHealthResponse(BaseModel):
     healthy: bool
     running_count: int
     stale_count: int
     cancelled_count: int
+
+
+class EvaluationQualityHealthResponse(BaseModel):
+    healthy: bool
+    status: str
+    latest_run_id: int | None
+    quality_gate_passed: bool
+    trend_status: str
+
+
+class EvaluationDashboardResponse(BaseModel):
+    latest: EvaluationRunResponse
+    comparison: EvaluationComparisonResponse | None
+    quality_health: EvaluationQualityHealthResponse
+    operational_health: EvaluationHealthResponse
+
+
+class EvaluationRunStartResponse(BaseModel):
+    evaluation_run_id: int
+    status: str
 
 
 class StaleEvaluationRunResponse(BaseModel):
@@ -89,3 +99,31 @@ class EvaluationObservabilityResponse(BaseModel):
     started_at: datetime | None
     completed_at: datetime | None
     duration_seconds: float | None
+
+
+class EvaluationMetricTrendResponse(BaseModel):
+    metric_name: str
+    previous_value: float
+    current_value: float
+    delta: float
+    direction: str
+
+
+class EvaluationTrendResponse(BaseModel):
+    trends: list[EvaluationMetricTrendResponse]
+
+
+class EvaluationMetricPointResponse(BaseModel):
+    run_id: int
+    created_at: datetime
+    value: float
+
+
+class EvaluationHistoricalTrendResponse(BaseModel):
+    metric_name: str
+    points: list[EvaluationMetricPointResponse]
+    direction: str
+
+
+class EvaluationHistoricalTrendsResponse(BaseModel):
+    trends: list[EvaluationHistoricalTrendResponse]

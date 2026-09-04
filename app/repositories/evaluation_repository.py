@@ -79,13 +79,22 @@ class EvaluationRepository:
 
     def list_runs(
         self,
+        limit: int | None = None,
     ) -> list[EvaluationRun]:
-
-        return (
-            self.db.query(EvaluationRun).order_by(EvaluationRun.created_at.desc()).all()
+        query = (
+            self.db.query(EvaluationRun)
+            .order_by(
+                EvaluationRun.created_at.desc(),
+                EvaluationRun.id.desc(),
+            )
         )
 
-    def create_from_evaluation(
+        if limit is not None:
+            query = query.limit(limit)
+
+        return query.all()
+
+    def create_run_from_report(
         self,
         dataset_name: str,
         llm_model: str,

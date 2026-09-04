@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
@@ -12,6 +12,13 @@ from app.schemas.evaluation import (
     EvaluationObservabilityResponse,
     EvaluationRunResponse,
     EvaluationSnapshotResponse,
+    EvaluationMetricTrendResponse,
+    EvaluationTrendResponse,
+    StaleEvaluationRunResponse,
+    StaleEvaluationRunsResponse,
+    EvaluationHistoricalTrendResponse,
+    EvaluationHistoricalTrendsResponse,
+    EvaluationMetricPointResponse,
 )
 from app.ai.evaluation.evaluation_comparator import (
     compare_evaluation_runs,
@@ -44,6 +51,8 @@ from app.ai.evaluation.evaluation_snapshot import (
 
 from app.schemas.evaluation import (
     EvaluationRunStartResponse,
+    EvaluationQualityHealthResponse,
+    EvaluationHealthResponse,
 )
 from app.core.constants import (
     EVALUATION_STATUS_QUEUED,
@@ -71,19 +80,32 @@ from app.ai.evaluation.stale_evaluation import (
     is_evaluation_stale,
 )
 
-from app.schemas.evaluation import (
-    StaleEvaluationRunResponse,
-    StaleEvaluationRunsResponse,
-)
 from datetime import datetime, timezone
+
+from app.ai.evaluation.evaluation_history import (
+    build_evaluation_history,
+)
+
+from app.ai.evaluation.evaluation_trend_service import (
+    build_latest_evaluation_trends,
+)
+from app.ai.evaluation.evaluation_historical_trend_service import (
+    build_evaluation_historical_trends,
+)
+from app.ai.evaluation.evaluation_quality_health_service import (
+    build_evaluation_quality_health,
+)
+from app.ai.evaluation.evaluation_health import (
+    evaluate_health,
+)
+from app.ai.evaluation.evaluation_dashboard_service import (
+    build_evaluation_dashboard,
+)
+
 
 router = APIRouter(
     prefix="/evaluations",
     tags=["Evaluations"],
-)
-
-from app.ai.evaluation.evaluation_duration import (
-    calculate_duration_seconds,
 )
 
 
@@ -181,35 +203,44 @@ def get_evaluation_dashboard(
 ):
     repository = EvaluationRepository(db)
 
-    latest = repository.get_latest_run()
-
-    if latest is None:
+    try:
+        dashboard = build_evaluation_dashboard(repository)
+    except ValueError as exc:
         raise HTTPException(
             status_code=404,
-            detail="No evaluation runs found.",
-        )
-
-    previous = repository.get_previous_run(latest.id)
-
-    comparison_response = None
-
-    if previous is not None:
-        comparison = compare_evaluation_runs(
-            previous=previous,
-            current=latest,
-        )
-
-        comparison_response = EvaluationComparisonResponse(
-            retrieval_hit_rate_delta=(comparison.retrieval_hit_rate_delta),
-            groundedness_delta=(comparison.groundedness_delta),
-            semantic_relevance_delta=(comparison.semantic_relevance_delta),
-            source_count_delta=(comparison.source_count_delta),
-            overall_pass_rate_delta=(comparison.overall_pass_rate_delta),
+            detail=str(exc),
         )
 
     return EvaluationDashboardResponse(
-        latest=_to_response(latest),
-        comparison=comparison_response,
+        latest=_to_response(dashboard.latest),
+        comparison=(
+            EvaluationComparisonResponse(
+                retrieval_hit_rate_delta=(
+                    dashboard.comparison.retrieval_hit_rate_delta
+                ),
+                groundedness_delta=(dashboard.comparison.groundedness_delta),
+                semantic_relevance_delta=(
+                    dashboard.comparison.semantic_relevance_delta
+                ),
+                source_count_delta=(dashboard.comparison.source_count_delta),
+                overall_pass_rate_delta=(dashboard.comparison.overall_pass_rate_delta),
+            )
+            if dashboard.comparison is not None
+            else None
+        ),
+        quality_health=EvaluationQualityHealthResponse(
+            healthy=dashboard.quality_health.healthy,
+            status=dashboard.quality_health.status,
+            latest_run_id=dashboard.quality_health.latest_run_id,
+            quality_gate_passed=(dashboard.quality_health.quality_gate_passed),
+            trend_status=dashboard.quality_health.trend_status,
+        ),
+        operational_health=EvaluationHealthResponse(
+            healthy=dashboard.operational_health.healthy,
+            running_count=(dashboard.operational_health.running_count),
+            stale_count=(dashboard.operational_health.stale_count),
+            cancelled_count=(dashboard.operational_health.cancelled_count),
+        ),
     )
 
 
@@ -315,6 +346,102 @@ def get_latest_evaluation_observability(
             run.started_at,
             run.completed_at,
         ),
+    )
+
+
+@router.get(
+    "/observability/history",
+    response_model=EvaluationHistoryResponse,
+)
+def get_evaluation_observability_history(
+    db: Session = Depends(get_db),
+):
+    repository = EvaluationRepository(db)
+
+    runs = repository.list_runs()
+
+    return build_evaluation_history(runs)
+
+
+@router.get(
+    "/trends",
+    response_model=EvaluationTrendResponse,
+)
+def get_evaluation_trends(
+    db: Session = Depends(get_db),
+):
+    repository = EvaluationRepository(db)
+
+    trends = build_latest_evaluation_trends(repository)
+
+    return EvaluationTrendResponse(
+        trends=[
+            EvaluationMetricTrendResponse(
+                metric_name=trend.metric_name,
+                previous_value=trend.previous_value,
+                current_value=trend.current_value,
+                delta=trend.delta,
+                direction=trend.direction,
+            )
+            for trend in trends
+        ],
+    )
+
+
+@router.get(
+    "/historical-trends",
+    response_model=EvaluationHistoricalTrendsResponse,
+)
+def get_evaluation_historical_trends(
+    limit: int | None = Query(
+        default=None,
+        ge=1,
+    ),
+    db: Session = Depends(get_db),
+):
+    repository = EvaluationRepository(db)
+
+    trends = build_evaluation_historical_trends(
+        repository,
+        limit=limit,
+    )
+
+    return EvaluationHistoricalTrendsResponse(
+        trends=[
+            EvaluationHistoricalTrendResponse(
+                metric_name=trend.metric_name,
+                direction=trend.direction,
+                points=[
+                    EvaluationMetricPointResponse(
+                        run_id=point.run_id,
+                        created_at=point.created_at,
+                        value=point.value,
+                    )
+                    for point in trend.points
+                ],
+            )
+            for trend in trends
+        ]
+    )
+
+
+@router.get(
+    "/quality-health",
+    response_model=EvaluationQualityHealthResponse,
+)
+def get_evaluation_quality_health(
+    db: Session = Depends(get_db),
+):
+    repository = EvaluationRepository(db)
+
+    health = build_evaluation_quality_health(repository)
+
+    return EvaluationQualityHealthResponse(
+        healthy=health.healthy,
+        status=health.status,
+        latest_run_id=health.latest_run_id,
+        quality_gate_passed=health.quality_gate_passed,
+        trend_status=health.trend_status,
     )
 
 

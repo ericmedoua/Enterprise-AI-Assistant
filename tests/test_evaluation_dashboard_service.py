@@ -7,6 +7,13 @@ from app.ai.evaluation.evaluation_dashboard_service import (
 )
 
 
+@patch(
+    "app.ai.evaluation.evaluation_dashboard_service."
+    "build_evaluation_deployment_readiness"
+)
+@patch(
+    "app.ai.evaluation.evaluation_dashboard_service.build_latest_evaluation_insights"
+)
 @patch("app.ai.evaluation.evaluation_dashboard_service.evaluate_health")
 @patch("app.ai.evaluation.evaluation_dashboard_service.build_evaluation_quality_health")
 @patch("app.ai.evaluation.evaluation_dashboard_service.compare_evaluation_runs")
@@ -14,7 +21,21 @@ def test_build_evaluation_dashboard(
     mock_compare,
     mock_quality_health,
     mock_evaluate_health,
+    mock_build_insights,
+    mock_deployment_readiness,
 ):
+    insights = [
+        Mock(
+            metric_name="average_groundedness",
+            severity="warning",
+            message=(
+                "average_groundedness is declining "
+                "compared with the previous evaluation."
+            ),
+        )
+    ]
+
+    mock_build_insights.return_value = insights
     repository = Mock()
 
     latest = Mock(id=10)
@@ -28,19 +49,27 @@ def test_build_evaluation_dashboard(
     comparison = Mock()
     quality_health = Mock()
     operational_health = Mock()
+    deployment_readiness = Mock(
+        ready=True,
+        status="ready",
+        reason="Evaluation quality checks passed.",
+    )
 
     mock_compare.return_value = comparison
     mock_quality_health.return_value = quality_health
     mock_evaluate_health.return_value = operational_health
+    mock_deployment_readiness.return_value = deployment_readiness
 
     result = build_evaluation_dashboard(repository)
 
     assert isinstance(result, EvaluationDashboard)
 
     assert result.latest is latest
+    assert result.insights is insights
     assert result.comparison is comparison
     assert result.quality_health is quality_health
     assert result.operational_health is operational_health
+    assert result.deployment_readiness is deployment_readiness
 
     repository.get_latest_run.assert_called_once()
 
@@ -62,6 +91,8 @@ def test_build_evaluation_dashboard(
         cancelled_count=0,
     )
 
+    mock_build_insights.assert_called_once_with(repository)
+
 
 def test_build_evaluation_dashboard_without_latest_run():
     repository = Mock()
@@ -79,12 +110,22 @@ def test_build_evaluation_dashboard_without_latest_run():
     repository.count_cancelled_runs.assert_not_called()
 
 
+@patch(
+    "app.ai.evaluation.evaluation_dashboard_service.build_latest_evaluation_insights"
+)
 @patch("app.ai.evaluation.evaluation_dashboard_service.evaluate_health")
 @patch("app.ai.evaluation.evaluation_dashboard_service.build_evaluation_quality_health")
+@patch(
+    "app.ai.evaluation.evaluation_dashboard_service.build_evaluation_deployment_readiness"
+)
 def test_build_evaluation_dashboard_without_previous_run(
+    mock_deployment_readiness,
     mock_quality_health,
     mock_evaluate_health,
+    mock_build_insights,
 ):
+    insights = []
+    mock_build_insights.return_value = insights
     repository = Mock()
 
     latest = Mock(id=10)
@@ -96,15 +137,21 @@ def test_build_evaluation_dashboard_without_previous_run(
 
     quality_health = Mock()
     operational_health = Mock()
+    deployment_readiness = Mock(
+        ready=True,
+        status="ready",
+        reason="Evaluation quality checks passed.",
+    )
 
     mock_quality_health.return_value = quality_health
     mock_evaluate_health.return_value = operational_health
-
+    mock_deployment_readiness.return_value = deployment_readiness
     result = build_evaluation_dashboard(repository)
 
     assert result.latest is latest
+    assert result.insights is insights
     assert result.comparison is None
     assert result.quality_health is quality_health
     assert result.operational_health is operational_health
-
+    assert result.deployment_readiness is deployment_readiness
     repository.get_previous_run.assert_called_once_with(10)

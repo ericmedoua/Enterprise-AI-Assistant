@@ -19,6 +19,8 @@ from app.schemas.evaluation import (
     EvaluationHistoricalTrendResponse,
     EvaluationHistoricalTrendsResponse,
     EvaluationMetricPointResponse,
+    EvaluationInsightResponse,
+    EvaluationDeploymentReadinessResponse,
 )
 from app.ai.evaluation.evaluation_comparator import (
     compare_evaluation_runs,
@@ -53,6 +55,15 @@ from app.schemas.evaluation import (
     EvaluationRunStartResponse,
     EvaluationQualityHealthResponse,
     EvaluationHealthResponse,
+    EvaluationDashboardHistoryResponse,
+    EvaluationHistoricalTrendResponse,
+    EvaluationMetricPointResponse,
+    EvaluationComparisonResponse,
+    EvaluationDashboardResponse,
+    EvaluationDeploymentReadinessResponse,
+    EvaluationHealthResponse,
+    EvaluationInsightResponse,
+    EvaluationQualityHealthResponse,
 )
 from app.core.constants import (
     EVALUATION_STATUS_QUEUED,
@@ -100,6 +111,12 @@ from app.ai.evaluation.evaluation_health import (
 )
 from app.ai.evaluation.evaluation_dashboard_service import (
     build_evaluation_dashboard,
+)
+from app.ai.evaluation.evaluation_dashboard_history_service import (
+    build_evaluation_dashboard_history,
+)
+from app.ai.evaluation.evaluation_deployment_readiness_service import (
+    build_evaluation_deployment_readiness,
 )
 
 
@@ -211,6 +228,15 @@ def get_evaluation_dashboard(
             detail=str(exc),
         )
 
+    insights = [
+        EvaluationInsightResponse(
+            metric_name=insight.metric_name,
+            severity=insight.severity,
+            message=insight.message,
+        )
+        for insight in dashboard.insights
+    ]
+
     return EvaluationDashboardResponse(
         latest=_to_response(dashboard.latest),
         comparison=(
@@ -218,11 +244,11 @@ def get_evaluation_dashboard(
                 retrieval_hit_rate_delta=(
                     dashboard.comparison.retrieval_hit_rate_delta
                 ),
-                groundedness_delta=(dashboard.comparison.groundedness_delta),
+                groundedness_delta=dashboard.comparison.groundedness_delta,
                 semantic_relevance_delta=(
                     dashboard.comparison.semantic_relevance_delta
                 ),
-                source_count_delta=(dashboard.comparison.source_count_delta),
+                source_count_delta=dashboard.comparison.source_count_delta,
                 overall_pass_rate_delta=(dashboard.comparison.overall_pass_rate_delta),
             )
             if dashboard.comparison is not None
@@ -232,14 +258,20 @@ def get_evaluation_dashboard(
             healthy=dashboard.quality_health.healthy,
             status=dashboard.quality_health.status,
             latest_run_id=dashboard.quality_health.latest_run_id,
-            quality_gate_passed=(dashboard.quality_health.quality_gate_passed),
+            quality_gate_passed=dashboard.quality_health.quality_gate_passed,
             trend_status=dashboard.quality_health.trend_status,
         ),
         operational_health=EvaluationHealthResponse(
             healthy=dashboard.operational_health.healthy,
-            running_count=(dashboard.operational_health.running_count),
-            stale_count=(dashboard.operational_health.stale_count),
-            cancelled_count=(dashboard.operational_health.cancelled_count),
+            running_count=dashboard.operational_health.running_count,
+            stale_count=dashboard.operational_health.stale_count,
+            cancelled_count=dashboard.operational_health.cancelled_count,
+        ),
+        insights=insights,
+        deployment_readiness=EvaluationDeploymentReadinessResponse(
+            ready=dashboard.deployment_readiness.ready,
+            status=dashboard.deployment_readiness.status,
+            reason=dashboard.deployment_readiness.reason,
         ),
     )
 
@@ -442,6 +474,64 @@ def get_evaluation_quality_health(
         latest_run_id=health.latest_run_id,
         quality_gate_passed=health.quality_gate_passed,
         trend_status=health.trend_status,
+    )
+
+
+@router.get(
+    "/historical-dashboard",
+    response_model=EvaluationDashboardHistoryResponse,
+)
+def get_historical_evaluation_dashboard(
+    limit: int | None = Query(default=None, ge=1),
+    db: Session = Depends(get_db),
+):
+    repository = EvaluationRepository(db)
+
+    dashboard_history = build_evaluation_dashboard_history(
+        repository,
+        limit=limit,
+    )
+
+    return EvaluationDashboardHistoryResponse(
+        total_runs=dashboard_history.total_runs,
+        passed_runs=dashboard_history.passed_runs,
+        failed_runs=dashboard_history.failed_runs,
+        pass_rate=dashboard_history.pass_rate,
+        latest_run_id=dashboard_history.latest_run_id,
+        latest_quality_gate_passed=dashboard_history.latest_quality_gate_passed,
+        trends=[
+            EvaluationHistoricalTrendResponse(
+                metric_name=trend.metric_name,
+                points=[
+                    EvaluationMetricPointResponse(
+                        run_id=point.run_id,
+                        created_at=point.created_at,
+                        value=point.value,
+                    )
+                    for point in trend.points
+                ],
+                direction=trend.direction,
+            )
+            for trend in dashboard_history.trends
+        ],
+    )
+
+
+@router.get(
+    "/deployment-readiness",
+    response_model=EvaluationDeploymentReadinessResponse,
+)
+def get_evaluation_deployment_readiness(
+    db: Session = Depends(get_db),
+):
+    repository = EvaluationRepository(db)
+
+    readiness = build_evaluation_deployment_readiness(repository)
+
+    return EvaluationDeploymentReadinessResponse(
+        ready=readiness.ready,
+        status=readiness.status,
+        reason=readiness.reason,
     )
 
 

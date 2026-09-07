@@ -324,11 +324,33 @@ def test_get_evaluation_dashboard(
         cancelled_count=0,
     )
 
+    insights = [
+        Mock(
+            metric_name="quality_gate",
+            severity="critical",
+            message=("The latest evaluation failed the quality gate."),
+        ),
+        Mock(
+            metric_name="average_groundedness",
+            severity="warning",
+            message=(
+                "average_groundedness is declining "
+                "compared with the previous evaluation."
+            ),
+        ),
+    ]
+
     mock_build_dashboard.return_value = Mock(
         latest=latest,
         comparison=comparison,
         quality_health=quality_health,
         operational_health=operational_health,
+        insights=insights,
+        deployment_readiness=Mock(
+            ready=True,
+            status="ready",
+            reason="Evaluation quality checks passed.",
+        ),
     )
 
     response = client.get("/api/v1/evaluations/dashboard")
@@ -353,6 +375,15 @@ def test_get_evaluation_dashboard(
     assert data["operational_health"]["running_count"] == 0
     assert data["operational_health"]["stale_count"] == 0
     assert data["operational_health"]["cancelled_count"] == 0
+
+    assert data["insights"] is not None
+    assert len(data["insights"]) == 2
+
+    assert data["insights"][0]["metric_name"] == ("quality_gate")
+    assert data["insights"][0]["severity"] == "critical"
+
+    assert data["insights"][1]["metric_name"] == ("average_groundedness")
+    assert data["insights"][1]["severity"] == "warning"
 
     mock_build_dashboard.assert_called_once()
 
@@ -1335,6 +1366,12 @@ def test_get_evaluation_dashboard_with_operational_degradation(
         comparison=comparison,
         quality_health=quality_health,
         operational_health=operational_health,
+        insights=[],
+        deployment_readiness=Mock(
+            ready=True,
+            status="ready",
+            reason="Evaluation quality checks passed.",
+        ),
     )
 
     response = client.get("/api/v1/evaluations/dashboard")
@@ -1354,3 +1391,385 @@ def test_get_evaluation_dashboard_with_operational_degradation(
     assert data["operational_health"]["cancelled_count"] == 3
 
     mock_build_dashboard.assert_called_once()
+
+
+def test_get_historical_evaluation_dashboard():
+    client = TestClient(app)
+
+    mock_trend = Mock(
+        metric_name="overall_pass_rate",
+        direction="improving",
+        points=[
+            Mock(
+                run_id=981,
+                created_at=datetime(2026, 9, 5, 17, 27, 37),
+                value=0.5,
+            ),
+            Mock(
+                run_id=991,
+                created_at=datetime(2026, 9, 5, 17, 40, 40),
+                value=1.0,
+            ),
+        ],
+    )
+
+    mock_history = Mock(
+        total_runs=2,
+        passed_runs=1,
+        failed_runs=1,
+        pass_rate=0.5,
+        latest_run_id=991,
+        latest_quality_gate_passed=True,
+        trends=[mock_trend],
+    )
+
+    with patch(
+        "app.api.evaluations.build_evaluation_dashboard_history",
+        return_value=mock_history,
+    ) as mock_build_history:
+        response = client.get("/api/v1/evaluations/historical-dashboard")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["total_runs"] == 2
+    assert data["passed_runs"] == 1
+    assert data["failed_runs"] == 1
+    assert data["pass_rate"] == 0.5
+    assert data["latest_run_id"] == 991
+    assert data["latest_quality_gate_passed"] is True
+
+    assert len(data["trends"]) == 1
+    assert data["trends"][0]["metric_name"] == "overall_pass_rate"
+    assert data["trends"][0]["direction"] == "improving"
+    assert len(data["trends"][0]["points"]) == 2
+
+    mock_build_history.assert_called_once()
+
+
+def test_get_historical_evaluation_dashboard_with_limit():
+    client = TestClient(app)
+
+    mock_history = Mock(
+        total_runs=1,
+        passed_runs=1,
+        failed_runs=0,
+        pass_rate=1.0,
+        latest_run_id=991,
+        latest_quality_gate_passed=True,
+        trends=[],
+    )
+
+    with patch(
+        "app.api.evaluations.build_evaluation_dashboard_history",
+        return_value=mock_history,
+    ) as mock_build_history:
+        response = client.get("/api/v1/evaluations/historical-dashboard?limit=10")
+
+    assert response.status_code == 200
+
+    mock_build_history.assert_called_once()
+
+    _, kwargs = mock_build_history.call_args
+    assert kwargs["limit"] == 10
+
+
+def test_get_historical_evaluation_dashboard_with_no_runs():
+    client = TestClient(app)
+
+    mock_history = Mock(
+        total_runs=0,
+        passed_runs=0,
+        failed_runs=0,
+        pass_rate=0.0,
+        latest_run_id=None,
+        latest_quality_gate_passed=None,
+        trends=[],
+    )
+
+    with patch(
+        "app.api.evaluations.build_evaluation_dashboard_history",
+        return_value=mock_history,
+    ):
+        response = client.get("/api/v1/evaluations/historical-dashboard")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["total_runs"] == 0
+    assert data["passed_runs"] == 0
+    assert data["failed_runs"] == 0
+    assert data["pass_rate"] == 0.0
+    assert data["latest_run_id"] is None
+    assert data["latest_quality_gate_passed"] is None
+    assert data["trends"] == []
+
+
+def test_get_evaluation_dashboard_with_regression_insight():
+    client = TestClient(app)
+
+    latest = Mock(
+        id=1001,
+        created_at=datetime(2026, 9, 5, 17, 40, 40),
+        dataset_name="rag-evaluation-v1",
+        llm_model="openai/gpt-oss-120b",
+        embedding_model="all-MiniLM-L6-v2",
+        git_commit="test-commit",
+        status="completed",
+        started_at=None,
+        completed_at=None,
+        total_cases=2,
+        retrieval_hit_rate=1.0,
+        average_groundedness=0.70,
+        average_semantic_relevance=0.60,
+        average_source_count=1.0,
+        overall_pass_rate=1.0,
+        quality_gate_passed=True,
+    )
+
+    comparison = Mock(
+        retrieval_hit_rate_delta=0.0,
+        groundedness_delta=-0.20,
+        semantic_relevance_delta=0.0,
+        source_count_delta=0.0,
+        overall_pass_rate_delta=0.0,
+    )
+
+    quality_health = Mock(
+        healthy=False,
+        status="degraded",
+        latest_run_id=1001,
+        quality_gate_passed=True,
+        trend_status="declining",
+    )
+
+    operational_health = Mock(
+        healthy=True,
+        running_count=0,
+        stale_count=0,
+        cancelled_count=0,
+    )
+
+    insights = [
+        Mock(
+            metric_name="average_groundedness",
+            severity="critical",
+            message="average_groundedness experienced a critical regression.",
+        )
+    ]
+
+    mock_dashboard = Mock(
+        latest=latest,
+        comparison=comparison,
+        quality_health=quality_health,
+        operational_health=operational_health,
+        insights=insights,
+        deployment_readiness=Mock(
+            ready=False,
+            status="blocked",
+            reason="Evaluation regressions were detected.",
+        ),
+    )
+
+    with patch(
+        "app.api.evaluations.build_evaluation_dashboard",
+        return_value=mock_dashboard,
+    ):
+        response = client.get("/api/v1/evaluations/dashboard")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert len(data["insights"]) == 1
+    assert data["insights"][0]["metric_name"] == ("average_groundedness")
+    assert data["insights"][0]["severity"] == "critical"
+    assert "regression" in data["insights"][0]["message"].lower()
+
+
+def test_get_evaluation_dashboard_with_quality_gate_and_regression_insights():
+    client = TestClient(app)
+
+    latest = Mock(
+        id=1002,
+        created_at=datetime(2026, 9, 5, 17, 45, 40),
+        dataset_name="rag-evaluation-v1",
+        llm_model="openai/gpt-oss-120b",
+        embedding_model="all-MiniLM-L6-v2",
+        git_commit="test-commit",
+        status="completed",
+        started_at=None,
+        completed_at=None,
+        total_cases=2,
+        retrieval_hit_rate=1.0,
+        average_groundedness=0.65,
+        average_semantic_relevance=0.50,
+        average_source_count=1.0,
+        overall_pass_rate=0.50,
+        quality_gate_passed=False,
+    )
+
+    comparison = Mock(
+        retrieval_hit_rate_delta=0.0,
+        groundedness_delta=-0.25,
+        semantic_relevance_delta=-0.10,
+        source_count_delta=0.0,
+        overall_pass_rate_delta=-0.50,
+    )
+
+    quality_health = Mock(
+        healthy=False,
+        status="degraded",
+        latest_run_id=1002,
+        quality_gate_passed=False,
+        trend_status="declining",
+    )
+
+    operational_health = Mock(
+        healthy=True,
+        running_count=0,
+        stale_count=0,
+        cancelled_count=0,
+    )
+
+    insights = [
+        Mock(
+            metric_name="quality_gate",
+            severity="critical",
+            message="The latest evaluation failed the quality gate.",
+        ),
+        Mock(
+            metric_name="average_groundedness",
+            severity="critical",
+            message="average_groundedness experienced a critical regression.",
+        ),
+    ]
+
+    mock_dashboard = Mock(
+        latest=latest,
+        comparison=comparison,
+        quality_health=quality_health,
+        operational_health=operational_health,
+        insights=insights,
+        deployment_readiness=Mock(
+            ready=False,
+            status="blocked",
+            reason="The evaluation quality gate failed.",
+        ),
+    )
+
+    with patch(
+        "app.api.evaluations.build_evaluation_dashboard",
+        return_value=mock_dashboard,
+    ):
+        response = client.get("/api/v1/evaluations/dashboard")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert len(data["insights"]) == 2
+
+    assert data["insights"][0]["metric_name"] == "quality_gate"
+    assert data["insights"][0]["severity"] == "critical"
+
+    assert data["insights"][1]["metric_name"] == ("average_groundedness")
+    assert data["insights"][1]["severity"] == "critical"
+
+
+def test_get_evaluation_deployment_readiness_ready():
+    client = TestClient(app)
+
+    readiness = Mock(
+        ready=True,
+        status="ready",
+        reason="Evaluation quality checks passed.",
+    )
+
+    with patch(
+        "app.api.evaluations.build_evaluation_deployment_readiness",
+        return_value=readiness,
+    ) as mock_build_readiness:
+        response = client.get("/api/v1/evaluations/deployment-readiness")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["ready"] is True
+    assert data["status"] == "ready"
+    assert data["reason"] == ("Evaluation quality checks passed.")
+
+    mock_build_readiness.assert_called_once()
+
+
+def test_get_evaluation_deployment_readiness_quality_gate_failed():
+    client = TestClient(app)
+
+    readiness = Mock(
+        ready=False,
+        status="blocked",
+        reason="The evaluation quality gate failed.",
+    )
+    with patch(
+        "app.api.evaluations.build_evaluation_deployment_readiness",
+        return_value=readiness,
+    ):
+        response = client.get("/api/v1/evaluations/deployment-readiness")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["ready"] is False
+    assert data["status"] == "blocked"
+    assert data["reason"] == ("The evaluation quality gate failed.")
+
+
+def test_get_evaluation_deployment_readiness_regression_detected():
+    client = TestClient(app)
+
+    readiness = Mock(
+        ready=False,
+        status="blocked",
+        reason="Evaluation regressions were detected.",
+    )
+
+    with patch(
+        "app.api.evaluations.build_evaluation_deployment_readiness",
+        return_value=readiness,
+    ):
+        response = client.get("/api/v1/evaluations/deployment-readiness")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["ready"] is False
+    assert data["status"] == "blocked"
+    assert data["reason"] == ("Evaluation regressions were detected.")
+
+
+def test_get_evaluation_deployment_readiness_no_evaluation():
+    client = TestClient(app)
+
+    readiness = Mock(
+        ready=False,
+        status="blocked",
+        reason="No evaluation run is available.",
+    )
+    with patch(
+        "app.api.evaluations.build_evaluation_deployment_readiness",
+        return_value=readiness,
+    ):
+        response = client.get("/api/v1/evaluations/deployment-readiness")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["ready"] is False
+    assert data["status"] == "blocked"
+    assert data["reason"] == ("No evaluation run is available.")

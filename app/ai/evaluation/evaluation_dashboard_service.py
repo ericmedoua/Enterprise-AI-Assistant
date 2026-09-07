@@ -19,6 +19,19 @@ from app.repositories.evaluation_repository import (
     EvaluationRepository,
 )
 
+from app.ai.evaluation.evaluation_insights import (
+    EvaluationInsight,
+)
+from app.ai.evaluation.evaluation_insight_service import (
+    build_latest_evaluation_insights,
+)
+from app.ai.evaluation.evaluation_deployment_readiness import (
+    EvaluationDeploymentReadiness,
+)
+from app.ai.evaluation.evaluation_deployment_readiness_service import (
+    build_evaluation_deployment_readiness,
+)
+
 
 @dataclass(frozen=True)
 class EvaluationDashboard:
@@ -26,6 +39,8 @@ class EvaluationDashboard:
     comparison: EvaluationComparison | None
     quality_health: EvaluationQualityHealth
     operational_health: EvaluationHealth
+    insights: list[EvaluationInsight]
+    deployment_readiness: EvaluationDeploymentReadiness
 
 
 def build_evaluation_dashboard(
@@ -48,6 +63,8 @@ def build_evaluation_dashboard(
 
     quality_health = build_evaluation_quality_health(repository)
 
+    insights = build_latest_evaluation_insights(repository)
+
     running_runs = repository.list_running_runs()
 
     cancelled_count = repository.count_cancelled_runs()
@@ -57,9 +74,13 @@ def build_evaluation_dashboard(
         cancelled_count=cancelled_count,
     )
 
+    deployment_readiness = build_evaluation_deployment_readiness(repository)
+
     return EvaluationDashboard(
         latest=latest,
         comparison=comparison,
         quality_health=quality_health,
         operational_health=operational_health,
+        insights=insights,
+        deployment_readiness=deployment_readiness,
     )

@@ -61,13 +61,6 @@ class EvaluationQualityHealthResponse(BaseModel):
     trend_status: str
 
 
-class EvaluationDashboardResponse(BaseModel):
-    latest: EvaluationRunResponse
-    comparison: EvaluationComparisonResponse | None
-    quality_health: EvaluationQualityHealthResponse
-    operational_health: EvaluationHealthResponse
-
-
 class EvaluationRunStartResponse(BaseModel):
     evaluation_run_id: int
     status: str
@@ -127,3 +120,34 @@ class EvaluationHistoricalTrendResponse(BaseModel):
 
 class EvaluationHistoricalTrendsResponse(BaseModel):
     trends: list[EvaluationHistoricalTrendResponse]
+
+
+class EvaluationInsightResponse(BaseModel):
+    metric_name: str
+    severity: str
+    message: str
+
+
+class EvaluationDashboardHistoryResponse(BaseModel):
+    total_runs: int
+    passed_runs: int
+    failed_runs: int
+    pass_rate: float
+    latest_run_id: int | None
+    latest_quality_gate_passed: bool | None
+    trends: list["EvaluationHistoricalTrendResponse"]
+
+
+class EvaluationDeploymentReadinessResponse(BaseModel):
+    ready: bool
+    status: str
+    reason: str
+
+
+class EvaluationDashboardResponse(BaseModel):
+    latest: EvaluationRunResponse
+    comparison: EvaluationComparisonResponse | None
+    quality_health: EvaluationQualityHealthResponse
+    operational_health: EvaluationHealthResponse
+    insights: list[EvaluationInsightResponse]
+    deployment_readiness: EvaluationDeploymentReadinessResponse

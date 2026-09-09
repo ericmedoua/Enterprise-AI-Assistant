@@ -10,6 +10,10 @@ def test_build_ci_report_when_deployment_is_ready():
 
     latest_run = Mock(
         quality_gate_passed=True,
+        retrieval_hit_rate=1.0,
+        average_groundedness=0.9,
+        average_semantic_relevance=0.8,
+        overall_pass_rate=0.85,
     )
 
     repository.get_latest_run.return_value = latest_run
@@ -32,6 +36,11 @@ def test_build_ci_report_when_deployment_is_ready():
     assert result.deployment_ready is True
     assert result.message == ("Evaluation passed and deployment is allowed.")
 
+    assert result.retrieval_hit_rate == 1.0
+    assert result.average_groundedness == 0.9
+    assert result.average_semantic_relevance == 0.8
+    assert result.overall_pass_rate == 0.85
+
     mock_build_readiness.assert_called_once_with(repository)
 
 
@@ -40,6 +49,10 @@ def test_build_ci_report_when_quality_gate_fails():
 
     latest_run = Mock(
         quality_gate_passed=False,
+        retrieval_hit_rate=0.8,
+        average_groundedness=0.7,
+        average_semantic_relevance=0.6,
+        overall_pass_rate=0.5,
     )
 
     repository.get_latest_run.return_value = latest_run
@@ -62,6 +75,11 @@ def test_build_ci_report_when_quality_gate_fails():
     assert result.deployment_ready is False
     assert result.message == ("Evaluation quality gate failed.")
 
+    assert result.retrieval_hit_rate == 0.8
+    assert result.average_groundedness == 0.7
+    assert result.average_semantic_relevance == 0.6
+    assert result.overall_pass_rate == 0.5
+
 
 def test_build_ci_report_when_no_evaluation_exists():
     repository = Mock()
@@ -73,3 +91,8 @@ def test_build_ci_report_when_no_evaluation_exists():
     assert result.status == "failed"
     assert result.quality_gate_passed is False
     assert result.deployment_ready is False
+
+    assert result.retrieval_hit_rate == 0.0
+    assert result.average_groundedness == 0.0
+    assert result.average_semantic_relevance == 0.0
+    assert result.overall_pass_rate == 0.0

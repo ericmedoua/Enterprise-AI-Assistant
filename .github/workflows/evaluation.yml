@@ -78,3 +78,10 @@ jobs:
       - name: Run evaluation gate
         run: |
           python -m app.ai.evaluation.cli
+
+      - name: Upload evaluation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluation-ci-report
+          path: artifacts/evaluation-ci-report.txt

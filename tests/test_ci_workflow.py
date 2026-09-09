@@ -108,3 +108,26 @@ def test_evaluation_gate_is_final_execution_step():
     workflow_after_evaluation = content[evaluation_position:]
 
     assert "continue-on-error: true" not in workflow_after_evaluation
+
+
+def test_evaluation_workflow_uploads_ci_report():
+    workflow = Path(".github/workflows/evaluation.yml")
+
+    content = workflow.read_text(encoding="utf-8")
+
+    assert "actions/upload-artifact@v4" in content
+    assert "evaluation-ci-report" in content
+    assert "artifacts/evaluation-ci-report.txt" in content
+
+
+def test_evaluation_report_is_uploaded_even_when_gate_fails():
+    workflow = Path(".github/workflows/evaluation.yml")
+
+    content = workflow.read_text(encoding="utf-8")
+
+    artifact_position = content.index("- name: Upload evaluation report")
+
+    artifact_section = content[artifact_position:]
+
+    assert "if: always()" in artifact_section
+    assert "actions/upload-artifact@v4" in artifact_section

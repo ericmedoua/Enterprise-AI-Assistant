@@ -1,0 +1,16 @@
+========================================
+RAG EVALUATION CI REPORT
+========================================
+Status: PASSED
+Quality gate: PASSED
+Deployment: ALLOWED
+
+Evaluation Metrics
+------------------
+Retrieval hit rate: 100.00%
+Groundedness: 100.00%
+Semantic relevance: 60.69%
+Overall pass rate: 100.00%
+
+Reason: Evaluation passed and deployment is allowed.
+========================================

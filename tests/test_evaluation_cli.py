@@ -5,6 +5,15 @@ from unittest.mock import Mock, patch
     "app.ai.evaluation.cli.run_evaluation_deployment_gate",
     return_value=0,
 )
+@patch(
+    "app.ai.evaluation.cli.format_evaluation_ci_report",
+)
+@patch(
+    "app.ai.evaluation.cli.build_evaluation_ci_report_for_repository",
+)
+@patch(
+    "app.ai.evaluation.cli.write_evaluation_ci_report",
+)
 @patch("app.ai.evaluation.cli.EvaluationRepository")
 @patch("app.ai.evaluation.cli.SessionLocal")
 @patch("app.ai.evaluation.cli.get_evaluation_metadata")
@@ -16,6 +25,9 @@ def test_cli_main(
     mock_metadata,
     mock_session,
     mock_repository,
+    mock_write_ci_report,
+    mock_build_ci_report,
+    mock_format_ci_report,
     mock_run_gate,
 ):
     from app.ai.evaluation.cli import main
@@ -43,9 +55,22 @@ def test_cli_main(
     repository = Mock()
     mock_repository.return_value = repository
 
+    ci_report = Mock()
+
+    mock_build_ci_report.return_value = ci_report
+    mock_format_ci_report.return_value = "RAG EVALUATION CI REPORT"
+
     result = main()
 
     assert result == 0
+
+    mock_build_ci_report.assert_called_once_with(repository)
+
+    mock_format_ci_report.assert_called_once_with(ci_report)
+
+    mock_write_ci_report.assert_called_once_with(ci_report)
+
+    mock_run_gate.assert_called_once_with(repository)
 
     mock_runner.assert_called_once_with(
         db=db,
@@ -67,17 +92,33 @@ def test_cli_main(
     "app.ai.evaluation.cli.run_evaluation_deployment_gate",
     return_value=1,
 )
+@patch(
+    "app.ai.evaluation.cli.format_evaluation_ci_report",
+    return_value="RAG EVALUATION CI REPORT",
+)
+@patch(
+    "app.ai.evaluation.cli.build_evaluation_ci_report_for_repository",
+)
+@patch(
+    "app.ai.evaluation.cli.write_evaluation_ci_report",
+)
 @patch("app.ai.evaluation.cli.EvaluationRepository")
 @patch("app.ai.evaluation.cli.SessionLocal")
 @patch("app.ai.evaluation.cli.get_evaluation_metadata")
 @patch("app.ai.evaluation.cli.EvaluationRunner")
-@patch("app.ai.evaluation.cli.format_evaluation_snapshot")
+@patch(
+    "app.ai.evaluation.cli.format_evaluation_snapshot",
+    return_value="RAG EVALUATION SNAPSHOT",
+)
 def test_cli_main_returns_blocked_exit_code(
     mock_format_snapshot,
     mock_runner,
     mock_metadata,
     mock_session,
     mock_repository,
+    mock_write_ci_report,
+    mock_build_ci_report,
+    mock_format_ci_report,
     mock_run_gate,
 ):
     from app.ai.evaluation.cli import main
@@ -88,15 +129,16 @@ def test_cli_main_returns_blocked_exit_code(
         git_commit="a" * 40,
     )
 
+    mock_metadata.return_value = metadata
+
     snapshot = Mock()
 
-    mock_metadata.return_value = metadata
     mock_runner.return_value.run.return_value = Mock(
         snapshot=snapshot,
-        evaluation_run_id=43,
+        evaluation_run_id=44,
     )
 
-    mock_format_snapshot.return_value = "RAG EVALUATION SNAPSHOT"
+    mock_build_ci_report.return_value = Mock()
 
     db = Mock()
     mock_session.return_value = db
@@ -108,7 +150,9 @@ def test_cli_main_returns_blocked_exit_code(
 
     assert result == 1
 
-    mock_repository.assert_called_once_with(db)
+    mock_build_ci_report.assert_called_once_with(repository)
+    mock_write_ci_report.assert_called_once_with(mock_build_ci_report.return_value)
+
     mock_run_gate.assert_called_once_with(repository)
 
     db.close.assert_called_once()

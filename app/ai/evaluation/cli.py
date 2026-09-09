@@ -14,6 +14,15 @@ from app.database.session import SessionLocal
 from app.repositories.evaluation_repository import (
     EvaluationRepository,
 )
+from app.ai.evaluation.evaluation_ci_report_formatter import (
+    format_evaluation_ci_report,
+)
+from app.ai.evaluation.evaluation_ci_report_service import (
+    build_evaluation_ci_report_for_repository,
+)
+from app.ai.evaluation.evaluation_ci_report_artifact import (
+    write_evaluation_ci_report,
+)
 
 
 def main() -> int:
@@ -32,6 +41,12 @@ def main() -> int:
         print(format_evaluation_snapshot(result.snapshot))
 
         repository = EvaluationRepository(db)
+
+        ci_report = build_evaluation_ci_report_for_repository(repository)
+
+        print(format_evaluation_ci_report(ci_report))
+
+        write_evaluation_ci_report(ci_report)
 
         return run_evaluation_deployment_gate(repository)
 

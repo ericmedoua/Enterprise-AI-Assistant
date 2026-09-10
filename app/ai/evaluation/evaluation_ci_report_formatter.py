@@ -1,9 +1,20 @@
 from app.ai.evaluation.evaluation_ci_report import EvaluationCIReport
+from app.ai.evaluation.evaluation_comparison_report import (
+    format_evaluation_comparison,
+)
 
 
-def format_evaluation_ci_report(report: EvaluationCIReport) -> str:
+def format_evaluation_ci_report(
+    report: EvaluationCIReport, include_comparison: bool = False
+) -> str:
     quality_gate = "PASSED" if report.quality_gate_passed else "FAILED"
     deployment = "ALLOWED" if report.deployment_ready else "BLOCKED"
+    comparison_section = ""
+
+    if include_comparison and report.comparison is not None:
+        comparison_section = (
+            "\n" + format_evaluation_comparison(report.comparison) + "\n"
+        )
 
     return (
         "========================================\n"
@@ -21,5 +32,6 @@ def format_evaluation_ci_report(report: EvaluationCIReport) -> str:
         f"Overall pass rate: {report.overall_pass_rate:.2%}\n"
         "\n"
         f"Reason: {report.message}\n"
+        f"{comparison_section}"
         "========================================"
     )

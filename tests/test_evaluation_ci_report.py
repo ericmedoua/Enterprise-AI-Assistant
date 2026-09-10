@@ -1,6 +1,7 @@
 from app.ai.evaluation.evaluation_ci_report import (
     build_evaluation_ci_report,
 )
+from app.ai.evaluation.evaluation_comparator import EvaluationComparison
 
 
 def test_ci_report_when_deployment_is_ready():
@@ -66,3 +67,25 @@ def test_ci_report_when_deployment_is_blocked_after_quality_pass():
     assert report.average_groundedness == 0.9
     assert report.average_semantic_relevance == 0.8
     assert report.overall_pass_rate == 0.85
+
+
+def test_build_evaluation_ci_report_includes_comparison():
+    comparison = EvaluationComparison(
+        retrieval_hit_rate_delta=-0.10,
+        groundedness_delta=0.05,
+        semantic_relevance_delta=0.02,
+        source_count_delta=0.50,
+        overall_pass_rate_delta=-0.10,
+    )
+
+    report = build_evaluation_ci_report(
+        quality_gate_passed=True,
+        deployment_ready=True,
+        retrieval_hit_rate=1.0,
+        average_groundedness=0.9,
+        average_semantic_relevance=0.8,
+        overall_pass_rate=0.95,
+        comparison=comparison,
+    )
+
+    assert report.comparison == comparison

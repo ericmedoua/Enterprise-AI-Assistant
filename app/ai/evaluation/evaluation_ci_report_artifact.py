@@ -20,7 +20,10 @@ def write_evaluation_ci_report(
     )
 
     path.write_text(
-        format_evaluation_ci_report(report),
+        format_evaluation_ci_report(
+            report,
+            include_comparison=True,
+        ),
         encoding="utf-8",
     )
 

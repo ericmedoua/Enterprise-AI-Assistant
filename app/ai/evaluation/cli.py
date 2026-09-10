@@ -44,7 +44,12 @@ def main() -> int:
 
         ci_report = build_evaluation_ci_report_for_repository(repository)
 
-        print(format_evaluation_ci_report(ci_report))
+        print(
+            format_evaluation_ci_report(
+                ci_report,
+                include_comparison=True,
+            )
+        )
 
         write_evaluation_ci_report(ci_report)
 

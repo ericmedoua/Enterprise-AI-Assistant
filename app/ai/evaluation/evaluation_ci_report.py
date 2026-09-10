@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from app.ai.evaluation.evaluation_comparator import EvaluationComparison
 
 
 @dataclass(frozen=True)
@@ -11,6 +12,7 @@ class EvaluationCIReport:
     average_groundedness: float
     average_semantic_relevance: float
     overall_pass_rate: float
+    comparison: EvaluationComparison | None = None
 
 
 def build_evaluation_ci_report(
@@ -20,6 +22,7 @@ def build_evaluation_ci_report(
     average_groundedness: float,
     average_semantic_relevance: float,
     overall_pass_rate: float,
+    comparison: EvaluationComparison | None = None,
 ) -> EvaluationCIReport:
     if deployment_ready:
         return EvaluationCIReport(
@@ -31,6 +34,7 @@ def build_evaluation_ci_report(
             average_groundedness=average_groundedness,
             average_semantic_relevance=average_semantic_relevance,
             overall_pass_rate=overall_pass_rate,
+            comparison=comparison,
         )
 
     if not quality_gate_passed:

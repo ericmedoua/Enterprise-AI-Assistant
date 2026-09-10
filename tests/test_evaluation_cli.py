@@ -66,7 +66,10 @@ def test_cli_main(
 
     mock_build_ci_report.assert_called_once_with(repository)
 
-    mock_format_ci_report.assert_called_once_with(ci_report)
+    mock_format_ci_report.assert_called_once_with(
+        ci_report,
+        include_comparison=True,
+    )
 
     mock_write_ci_report.assert_called_once_with(ci_report)
 

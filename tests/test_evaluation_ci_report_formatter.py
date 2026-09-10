@@ -4,6 +4,7 @@ from app.ai.evaluation.evaluation_ci_report import (
 from app.ai.evaluation.evaluation_ci_report_formatter import (
     format_evaluation_ci_report,
 )
+from app.ai.evaluation.evaluation_comparator import EvaluationComparison
 
 
 def test_format_evaluation_ci_report_when_passed():
@@ -16,9 +17,17 @@ def test_format_evaluation_ci_report_when_passed():
         average_groundedness=0.9,
         average_semantic_relevance=0.8,
         overall_pass_rate=0.95,
+        comparison=EvaluationComparison(
+            retrieval_hit_rate_delta=0.1,
+            groundedness_delta=0.05,
+            semantic_relevance_delta=0.02,
+            source_count_delta=0.5,
+            overall_pass_rate_delta=0.05,
+        ),
     )
 
     result = format_evaluation_ci_report(report)
+    output = format_evaluation_ci_report(report, include_comparison=True)
 
     assert "RAG EVALUATION CI REPORT" in result
     assert "Status: PASSED" in result
@@ -30,6 +39,14 @@ def test_format_evaluation_ci_report_when_passed():
     assert "Groundedness: 90.00%" in result
     assert "Semantic relevance: 80.00%" in result
     assert "Overall pass rate: 95.00%" in result
+
+    assert "EVALUATION COMPARISON" in output
+
+    assert "Retrieval delta:         +10.00%" in output
+    assert "Groundedness delta:      +5.00%" in output
+    assert "Semantic relevance:      +2.00%" in output
+    assert "Source count delta:      +0.50" in output
+    assert "Overall pass-rate delta: +5.00%" in output
 
 
 def test_format_evaluation_ci_report_when_blocked():
@@ -80,3 +97,27 @@ def test_format_evaluation_ci_report_when_quality_gate_passes_but_deployment_is_
     assert "Groundedness: 70.00%" in result
     assert "Semantic relevance: 60.00%" in result
     assert "Overall pass rate: 50.00%" in result
+
+
+def test_format_evaluation_ci_report_without_comparison():
+    report = EvaluationCIReport(
+        status="passed",
+        quality_gate_passed=True,
+        deployment_ready=True,
+        message="Evaluation passed and deployment is allowed.",
+        retrieval_hit_rate=1.0,
+        average_groundedness=0.9,
+        average_semantic_relevance=0.8,
+        overall_pass_rate=0.95,
+        comparison=None,
+    )
+
+    result = format_evaluation_ci_report(
+        report,
+        include_comparison=True,
+    )
+
+    assert "RAG EVALUATION CI REPORT" in result
+    assert "Evaluation Metrics" in result
+    assert "EVALUATION COMPARISON" not in result
+    assert "Reason: Evaluation passed and deployment is allowed." in result

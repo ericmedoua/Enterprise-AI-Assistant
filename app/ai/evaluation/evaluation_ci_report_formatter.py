@@ -4,6 +4,28 @@ from app.ai.evaluation.evaluation_comparison_report import (
 )
 
 
+def format_regression_details(
+    regressions,
+) -> str:
+    if not regressions:
+        return ""
+
+    lines = [
+        "",
+        "Regression Details",
+        "------------------",
+    ]
+
+    for regression in regressions:
+        lines.append(
+            f"- {regression.metric_name}: "
+            f"{regression.delta:+.2%} "
+            f"({regression.severity})"
+        )
+
+    return "\n".join(lines)
+
+
 def format_evaluation_ci_report(
     report: EvaluationCIReport, include_comparison: bool = False
 ) -> str:
@@ -15,6 +37,8 @@ def format_evaluation_ci_report(
         comparison_section = (
             "\n" + format_evaluation_comparison(report.comparison) + "\n"
         )
+
+    regression_section = format_regression_details(report.regressions)
 
     return (
         "========================================\n"
@@ -33,5 +57,6 @@ def format_evaluation_ci_report(
         "\n"
         f"Reason: {report.message}\n"
         f"{comparison_section}"
+        f"{regression_section}\n"
         "========================================"
     )

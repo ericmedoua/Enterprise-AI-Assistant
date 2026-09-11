@@ -1,24 +1,25 @@
 ========================================
 RAG EVALUATION CI REPORT
 ========================================
-Status: PASSED
-Quality gate: PASSED
-Deployment: ALLOWED
+Status: FAILED
+Quality gate: FAILED
+Deployment: BLOCKED
 
 Evaluation Metrics
 ------------------
 Retrieval hit rate: 100.00%
-Groundedness: 100.00%
-Semantic relevance: 60.69%
-Overall pass rate: 100.00%
+Groundedness: 75.00%
+Semantic relevance: 60.03%
+Overall pass rate: 50.00%
 
-Reason: Evaluation passed and deployment is allowed.
+Reason: Evaluation quality gate failed.
 
 EVALUATION COMPARISON
 =====================
 Retrieval delta:         +0.00%
-Groundedness delta:      +25.00%
-Semantic relevance:      +0.05%
+Groundedness delta:      +0.00%
+Semantic relevance:      +0.00%
 Source count delta:      +0.00
-Overall pass-rate delta: +50.00%
+Overall pass-rate delta: +0.00%
+
 ========================================

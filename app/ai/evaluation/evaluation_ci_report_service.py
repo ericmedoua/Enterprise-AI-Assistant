@@ -6,12 +6,21 @@ from app.ai.evaluation.evaluation_deployment_readiness_service import (
     build_evaluation_deployment_readiness,
 )
 from app.ai.evaluation.evaluation_comparator import compare_evaluation_runs
+from app.ai.evaluation.evaluation_regression import (
+    detect_evaluation_regressions,
+)
+from app.ai.evaluation.evaluation_trend_service import (
+    build_latest_evaluation_trends,
+)
 
 
 def build_evaluation_ci_report_for_repository(
     repository,
 ) -> EvaluationCIReport:
     latest_run = repository.get_latest_run()
+
+    trends = build_latest_evaluation_trends(repository)
+    regressions = detect_evaluation_regressions(trends)
 
     if latest_run is None:
         return build_evaluation_ci_report(
@@ -21,6 +30,7 @@ def build_evaluation_ci_report_for_repository(
             average_groundedness=0.0,
             average_semantic_relevance=0.0,
             overall_pass_rate=0.0,
+            regressions=[],
         )
 
     comparison = None
@@ -46,4 +56,5 @@ def build_evaluation_ci_report_for_repository(
         average_semantic_relevance=latest_run.average_semantic_relevance,
         overall_pass_rate=latest_run.overall_pass_rate,
         comparison=comparison,
+        regressions=regressions,
     )

@@ -17,9 +17,9 @@
   },
   "comparison": {
     "retrieval_hit_rate_delta": 0.0,
-    "groundedness_delta": -0.25,
-    "semantic_relevance_delta": -0.006568487561650738,
+    "groundedness_delta": 0.0,
+    "semantic_relevance_delta": 0.0,
     "source_count_delta": 0.0,
-    "overall_pass_rate_delta": -0.5
+    "overall_pass_rate_delta": 0.0
   }
 }

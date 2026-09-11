@@ -14,18 +14,10 @@ def test_build_ci_report_when_deployment_is_ready():
     latest_run = Mock(
         quality_gate_passed=True,
         retrieval_hit_rate=1.0,
-        average_groundedness=0.9,
-        average_semantic_relevance=0.8,
+        average_groundedness=0.90,
+        average_semantic_relevance=0.80,
         average_source_count=1.5,
         overall_pass_rate=0.85,
-    )
-
-    repository.get_latest_run.return_value = latest_run
-
-    readiness = Mock(
-        ready=True,
-        status="ready",
-        reason="Evaluation quality checks passed.",
     )
 
     previous_run = Mock(
@@ -36,7 +28,15 @@ def test_build_ci_report_when_deployment_is_ready():
         overall_pass_rate=0.8,
     )
 
+    repository.get_latest_run.return_value = latest_run
+    repository.list_runs.return_value = [latest_run, previous_run]
     repository.get_previous_run.return_value = previous_run
+
+    readiness = Mock(
+        ready=True,
+        status="ready",
+        reason="Evaluation quality checks passed.",
+    )
 
     with patch(
         "app.ai.evaluation.evaluation_ci_report_service."
@@ -50,6 +50,8 @@ def test_build_ci_report_when_deployment_is_ready():
     assert result.deployment_ready is True
     assert result.message == ("Evaluation passed and deployment is allowed.")
 
+    assert result.regressions is not None
+
     assert result.retrieval_hit_rate == 1.0
     assert result.average_groundedness == 0.9
     assert result.average_semantic_relevance == 0.8
@@ -61,6 +63,8 @@ def test_build_ci_report_when_deployment_is_ready():
     assert result.comparison.semantic_relevance_delta == pytest.approx(0.3)
     assert result.comparison.source_count_delta == pytest.approx(0.5)
     assert result.comparison.overall_pass_rate_delta == pytest.approx(0.05)
+
+    assert result.regressions == []
 
     mock_build_readiness.assert_called_once_with(repository)
 
@@ -78,6 +82,7 @@ def test_build_ci_report_when_quality_gate_fails():
     )
 
     repository.get_latest_run.return_value = latest_run
+    repository.list_runs.return_value = [latest_run]
     repository.get_previous_run.return_value = None
 
     readiness = Mock(
@@ -107,6 +112,8 @@ def test_build_ci_report_when_quality_gate_fails():
 def test_build_ci_report_when_no_evaluation_exists():
     repository = Mock()
 
+    repository.list_runs.return_value = []
+
     repository.get_latest_run.return_value = None
 
     result = build_evaluation_ci_report_for_repository(repository)
@@ -133,6 +140,7 @@ def test_build_ci_report_without_previous_run():
     )
 
     repository.get_latest_run.return_value = latest_run
+    repository.list_runs.return_value = [latest_run]
     repository.get_previous_run.return_value = None
 
     readiness = Mock(

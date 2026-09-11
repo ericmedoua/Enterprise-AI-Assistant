@@ -1,5 +1,6 @@
 from app.ai.evaluation.evaluation_ci_report import (
     EvaluationCIReport,
+    EvaluationRegression,
 )
 from app.ai.evaluation.evaluation_ci_report_formatter import (
     format_evaluation_ci_report,
@@ -34,6 +35,8 @@ def test_format_evaluation_ci_report_when_passed():
     assert "Quality gate: PASSED" in result
     assert "Deployment: ALLOWED" in result
     assert "Reason: Evaluation passed and deployment is allowed." in result
+
+    assert "Regression Details" not in result
 
     assert "Retrieval hit rate: 100.00%" in result
     assert "Groundedness: 90.00%" in result
@@ -121,3 +124,49 @@ def test_format_evaluation_ci_report_without_comparison():
     assert "Evaluation Metrics" in result
     assert "EVALUATION COMPARISON" not in result
     assert "Reason: Evaluation passed and deployment is allowed." in result
+
+
+def test_format_evaluation_ci_report_with_regressions():
+    report = EvaluationCIReport(
+        status="failed",
+        quality_gate_passed=False,
+        deployment_ready=False,
+        message="Evaluation quality gate failed.",
+        retrieval_hit_rate=1.0,
+        average_groundedness=0.70,
+        average_semantic_relevance=0.60,
+        overall_pass_rate=0.50,
+        regressions=[
+            EvaluationRegression(
+                metric_name="average_groundedness",
+                previous_value=0.90,
+                current_value=0.70,
+                delta=-0.20,
+                severity="critical",
+            ),
+            EvaluationRegression(
+                metric_name="average_semantic_relevance",
+                previous_value=0.80,
+                current_value=0.60,
+                delta=-0.20,
+                severity="critical",
+            ),
+            EvaluationRegression(
+                metric_name="overall_pass_rate",
+                previous_value=1.00,
+                current_value=0.50,
+                delta=-0.50,
+                severity="critical",
+            ),
+        ],
+    )
+
+    result = format_evaluation_ci_report(
+        report,
+        include_comparison=True,
+    )
+
+    assert "Regression Details" in result
+    assert "- average_groundedness: -20.00% (critical)" in result
+    assert "- average_semantic_relevance: -20.00% (critical)" in result
+    assert "- overall_pass_rate: -50.00% (critical)" in result

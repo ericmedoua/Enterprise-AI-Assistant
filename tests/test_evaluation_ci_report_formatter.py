@@ -1,5 +1,7 @@
 from app.ai.evaluation.evaluation_ci_report import (
     EvaluationCIReport,
+)
+from app.ai.evaluation.evaluation_regression import (
     EvaluationRegression,
 )
 from app.ai.evaluation.evaluation_ci_report_formatter import (
@@ -131,7 +133,9 @@ def test_format_evaluation_ci_report_with_regressions():
         status="failed",
         quality_gate_passed=False,
         deployment_ready=False,
-        message="Evaluation quality gate failed.",
+        message=(
+            "Evaluation quality gate failed and evaluation regressions were detected."
+        ),
         retrieval_hit_rate=1.0,
         average_groundedness=0.70,
         average_semantic_relevance=0.60,
@@ -166,7 +170,16 @@ def test_format_evaluation_ci_report_with_regressions():
         include_comparison=True,
     )
 
+    assert "Status: FAILED" in result
+    assert "Quality gate: FAILED" in result
+    assert "Deployment: BLOCKED" in result
+
     assert "Regression Details" in result
+
     assert "- average_groundedness: -20.00% (critical)" in result
     assert "- average_semantic_relevance: -20.00% (critical)" in result
     assert "- overall_pass_rate: -50.00% (critical)" in result
+
+    assert (
+        "Evaluation quality gate failed and evaluation regressions were detected."
+    ) in result

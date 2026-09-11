@@ -29,8 +29,8 @@ def test_build_ci_report_when_deployment_is_ready():
     )
 
     repository.get_latest_run.return_value = latest_run
-    repository.list_runs.return_value = [latest_run, previous_run]
     repository.get_previous_run.return_value = previous_run
+    repository.list_runs.return_value = [latest_run, previous_run]
 
     readiness = Mock(
         ready=True,
@@ -82,8 +82,8 @@ def test_build_ci_report_when_quality_gate_fails():
     )
 
     repository.get_latest_run.return_value = latest_run
-    repository.list_runs.return_value = [latest_run]
     repository.get_previous_run.return_value = None
+    repository.list_runs.return_value = [latest_run]
 
     readiness = Mock(
         ready=False,
@@ -112,9 +112,8 @@ def test_build_ci_report_when_quality_gate_fails():
 def test_build_ci_report_when_no_evaluation_exists():
     repository = Mock()
 
-    repository.list_runs.return_value = []
-
     repository.get_latest_run.return_value = None
+    repository.list_runs.return_value = []
 
     result = build_evaluation_ci_report_for_repository(repository)
 
@@ -140,8 +139,8 @@ def test_build_ci_report_without_previous_run():
     )
 
     repository.get_latest_run.return_value = latest_run
-    repository.list_runs.return_value = [latest_run]
     repository.get_previous_run.return_value = None
+    repository.list_runs.return_value = [latest_run]
 
     readiness = Mock(
         ready=True,
@@ -160,3 +159,57 @@ def test_build_ci_report_without_previous_run():
     assert result.quality_gate_passed is True
     assert result.deployment_ready is True
     assert result.comparison is None
+
+
+def test_build_ci_report_with_regressions():
+    repository = Mock()
+
+    latest_run = Mock(
+        quality_gate_passed=True,
+        retrieval_hit_rate=1.0,
+        average_groundedness=0.70,
+        average_semantic_relevance=0.60,
+        average_source_count=1.0,
+        overall_pass_rate=0.50,
+    )
+
+    previous_run = Mock(
+        retrieval_hit_rate=1.0,
+        average_groundedness=0.90,
+        average_semantic_relevance=0.80,
+        average_source_count=1.0,
+        overall_pass_rate=1.0,
+    )
+
+    repository.get_latest_run.return_value = latest_run
+    repository.get_previous_run.return_value = previous_run
+    repository.list_runs.return_value = [latest_run, previous_run]
+
+    readiness = Mock(
+        ready=False,
+        status="blocked",
+        reason="Evaluation regressions were detected.",
+    )
+
+    with patch(
+        "app.ai.evaluation.evaluation_ci_report_service."
+        "build_evaluation_deployment_readiness",
+        return_value=readiness,
+    ):
+        result = build_evaluation_ci_report_for_repository(repository)
+
+    assert result.quality_gate_passed is True
+    assert result.deployment_ready is False
+
+    assert result.comparison is not None
+    assert result.comparison.groundedness_delta == pytest.approx(-0.20)
+    assert result.comparison.semantic_relevance_delta == pytest.approx(-0.20)
+    assert result.comparison.overall_pass_rate_delta == pytest.approx(-0.50)
+
+    assert result.regressions is not None
+    assert len(result.regressions) == 3
+
+    assert result.message == (
+        "Evaluation passed the quality gate but "
+        "deployment is blocked by evaluation regressions."
+    )

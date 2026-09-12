@@ -9,7 +9,6 @@ Create Date: ...
 from typing import Sequence, Union
 
 from alembic import op
-import sqlalchemy as sa
 
 
 revision: str = "98d6925ee414"
@@ -19,22 +18,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Add completed_at to evaluation_runs."""
-
-    op.add_column(
-        "evaluation_runs",
-        sa.Column(
-            "completed_at",
-            sa.DateTime(),
-            nullable=True,
-        ),
-    )
+    """No-op: completed_at is already added by the parent migration."""
+    pass
 
 
 def downgrade() -> None:
-    """Remove completed_at from evaluation_runs."""
-
-    op.drop_column(
-        "evaluation_runs",
-        "completed_at",
-    )
+    """No-op: completed_at is owned by the parent migration."""
+    pass

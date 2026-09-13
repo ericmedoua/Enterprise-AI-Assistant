@@ -68,13 +68,17 @@ jobs:
         run: |
           alembic upgrade head    
 
+      - name: Prepare embedding model
+        run: |
+          python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
+
+      - name: Build retrieval index
+        run: |
+          python -c "from app.documents.services.indexing_service import IndexingService; IndexingService().index_document('storage/This Book Belongs To.pdf')"
+
       - name: Run tests
         run: |
           pytest -q
-
-      - name: Prepare embedding model
-        run: |
-          python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"    
 
       - name: Run evaluation gate
         run: |

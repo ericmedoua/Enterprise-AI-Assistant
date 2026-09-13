@@ -76,9 +76,13 @@ jobs:
         run: |
           python -c "from app.documents.services.indexing_service import IndexingService; IndexingService().index_document('storage/This Book Belongs To.pdf')"
 
+      - name: Verify retrieval index
+        run: |
+          python -c "from app.ai.vectorstore.chroma_service import ChromaService; s=ChromaService(); print('Chroma collection count:', s.vectorstore._collection.count()); docs=s.vectorstore.similarity_search('What do monkeys do?', k=4); print('Retrieved documents:', len(docs)); [print('SOURCE=', d.metadata.get('source'), 'CONTENT=', d.page_content[:200].replace('\n', ' ')) for d in docs]; assert s.vectorstore._collection.count() > 0, 'Chroma collection is empty'; assert any(d.metadata.get('source') == 'This Book Belongs To.pdf' for d in docs), 'Baseline PDF was not retrieved'"
+
       - name: Run tests
         run: |
-          pytest -q
+         pytest -q
 
       - name: Run evaluation gate
         run: |

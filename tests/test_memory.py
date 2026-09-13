@@ -1,50 +1,40 @@
 from app.ai.memory.conversation_memory import ConversationMemory
-from app.database.session import SessionLocal
-from app.repositories.chat_repository import ChatRepository
 from app.core.constants import MessageRole
-
-import os
-import sys
-
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-
-sys.path.insert(0, PROJECT_ROOT)
-
-from app.ai.memory.conversation_memory import ConversationMemory
+from app.repositories.chat_repository import ChatRepository
 
 
-db = SessionLocal()
+def test_conversation_memory(db, test_session):
+    repository = ChatRepository(db)
 
-repository = ChatRepository(db)
+    repository.save_message(
+        test_session.id,
+        MessageRole.USER.value,
+        "Hello",
+    )
 
-# -----------------------------------------
-# Create a test session
-# -----------------------------------------
+    repository.save_message(
+        test_session.id,
+        MessageRole.ASSISTANT.value,
+        "Hi!",
+    )
 
-session = repository.create_session(user_id=1, title="Memory Test")
+    repository.save_message(
+        test_session.id,
+        MessageRole.USER.value,
+        "Tell me about Python.",
+    )
 
-# -----------------------------------------
-# Insert some messages
-# -----------------------------------------
+    repository.save_message(
+        test_session.id,
+        MessageRole.ASSISTANT.value,
+        "Python is a programming language.",
+    )
 
-repository.save_message(session.id, MessageRole.USER.value, "Hello")
+    memory = ConversationMemory(repository)
 
-repository.save_message(session.id, MessageRole.ASSISTANT.value, "Hi!")
+    history = memory.format_history(test_session.id)
 
-repository.save_message(session.id, MessageRole.USER.value, "Tell me about Python.")
-
-repository.save_message(
-    session.id, MessageRole.ASSISTANT.value, "Python is a programming language."
-)
-
-# -----------------------------------------
-# Test Conversation Memory
-# -----------------------------------------
-
-memory = ConversationMemory(repository)
-
-history = memory.format_history(session.id)
-
-print(history)
-
-db.close()
+    assert history
+    assert "Hello" in history
+    assert "Tell me about Python." in history
+    assert "Python is a programming language." in history

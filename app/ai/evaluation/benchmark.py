@@ -89,7 +89,7 @@ def run_retrieval_benchmark(
 
     case_results = []
 
-    for case in cases:
+    for index, case in enumerate(cases, start=1):
         documents = retriever.invoke(case.question)
 
         hit = retrieval_hit(
@@ -137,7 +137,7 @@ def run_rag_benchmark(
 
     results = []
 
-    for case in cases:
+    for index, case in enumerate(cases, start=1):
         documents = retriever.invoke(case.question)
 
         context = "\n\n".join(document.page_content for document in documents)
@@ -180,6 +180,19 @@ def run_rag_benchmark(
             semantic_relevance=semantic_relevance,
             source_count=len(unique_sources),
         )
+
+        if not evaluation.overall_pass:
+            print("\n" + "=" * 60)
+            print("FAILED RAG EVALUATION CASE")
+            print("=" * 60)
+            print(f"Question: {case.question}")
+            print(f"Expected answer: {case.expected_answer}")
+            print(f"Generated answer:\n{answer}")
+            print(f"Retrieved context:\n{context}")
+            print(f"Retrieval hit: {retrieval_hit_result}")
+            print(f"Groundedness: {groundedness.score:.4f}")
+            print(f"Semantic relevance: {semantic_relevance.score:.4f}")
+            print(f"Overall pass: {evaluation.overall_pass}")
 
         results.append(evaluation)
 

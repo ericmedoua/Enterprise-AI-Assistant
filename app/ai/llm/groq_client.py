@@ -10,4 +10,5 @@ def get_llm():
         model=settings.GROQ_MODEL,
         temperature=0,
         streaming=True,
+        max_retries=5,
     )

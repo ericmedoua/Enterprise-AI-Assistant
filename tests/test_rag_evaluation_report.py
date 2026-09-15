@@ -1,3 +1,5 @@
+import pytest
+
 from app.ai.evaluation.benchmark import (
     run_rag_evaluation_report,
 )
@@ -7,6 +9,7 @@ from app.ai.evaluation.datasets.rag_evaluation_dataset import (
 )
 
 
+@pytest.mark.integration
 def test_real_rag_evaluation_report():
     report = run_rag_evaluation_report(RAG_EVALUATION_DATASET)
 

@@ -1,24 +1,24 @@
 {
   "dataset_name": "rag-evaluation-v1",
   "report": {
-    "total_cases": 2,
+    "total_cases": 8,
     "retrieval_hit_rate": 1.0,
-    "average_groundedness": 0.75,
-    "average_semantic_relevance": 0.6003416090472575,
+    "average_groundedness": 1.0,
+    "average_semantic_relevance": 0.6969430976643881,
     "average_source_count": 1.0,
-    "overall_pass_rate": 0.5
+    "overall_pass_rate": 1.0
   },
   "quality_gate": {
-    "passed": false,
+    "passed": true,
     "retrieval_passed": true,
-    "groundedness_passed": false,
+    "groundedness_passed": true,
     "semantic_relevance_passed": true,
-    "overall_passed": false
+    "overall_passed": true
   },
   "comparison": {
     "retrieval_hit_rate_delta": 0.0,
     "groundedness_delta": 0.0,
-    "semantic_relevance_delta": 0.0,
+    "semantic_relevance_delta": -0.002371686897336356,
     "source_count_delta": 0.0,
     "overall_pass_rate_delta": 0.0
   }

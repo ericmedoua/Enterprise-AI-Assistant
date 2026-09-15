@@ -987,6 +987,8 @@ def test_get_evaluation_trends(mock_repository):
         previous,
     ]
 
+    mock_repository.return_value.get_previous_compatible_run.return_value = previous
+
     response = client.get("/api/v1/evaluations/trends")
 
     assert response.status_code == 200
@@ -1025,6 +1027,8 @@ def test_get_evaluation_trends_with_insufficient_history(
         make_evaluation_run(run_id=1),
     ]
 
+    mock_repository.return_value.get_previous_compatible_run.return_value = None
+
     response = client.get("/api/v1/evaluations/trends")
 
     assert response.status_code == 200
@@ -1061,6 +1065,8 @@ def test_get_evaluation_trends_stable(mock_repository):
         previous,
     ]
 
+    mock_repository.return_value.get_previous_compatible_run.return_value = previous
+
     response = client.get("/api/v1/evaluations/trends")
 
     assert response.status_code == 200
@@ -1096,6 +1102,8 @@ def test_get_evaluation_trends_declining(mock_repository):
         current,
         previous,
     ]
+
+    mock_repository.return_value.get_previous_compatible_run.return_value = previous
 
     response = client.get("/api/v1/evaluations/trends")
 

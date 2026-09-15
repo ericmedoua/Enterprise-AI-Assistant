@@ -30,6 +30,7 @@ def test_build_ci_report_when_deployment_is_ready():
 
     repository.get_latest_run.return_value = latest_run
     repository.get_previous_run.return_value = previous_run
+    repository.get_previous_compatible_run.return_value = previous_run
     repository.list_runs.return_value = [latest_run, previous_run]
 
     readiness = Mock(
@@ -83,6 +84,7 @@ def test_build_ci_report_when_quality_gate_fails():
 
     repository.get_latest_run.return_value = latest_run
     repository.get_previous_run.return_value = None
+    repository.get_previous_compatible_run.return_value = None
     repository.list_runs.return_value = [latest_run]
 
     readiness = Mock(
@@ -140,6 +142,7 @@ def test_build_ci_report_without_previous_run():
 
     repository.get_latest_run.return_value = latest_run
     repository.get_previous_run.return_value = None
+    repository.get_previous_compatible_run.return_value = None
     repository.list_runs.return_value = [latest_run]
 
     readiness = Mock(
@@ -183,6 +186,7 @@ def test_build_ci_report_with_regressions():
 
     repository.get_latest_run.return_value = latest_run
     repository.get_previous_run.return_value = previous_run
+    repository.get_previous_compatible_run.return_value = previous_run
     repository.list_runs.return_value = [latest_run, previous_run]
 
     readiness = Mock(

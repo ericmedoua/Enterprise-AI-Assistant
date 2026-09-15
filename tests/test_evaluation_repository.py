@@ -133,6 +133,32 @@ def test_get_previous_run():
     db.query.return_value.filter.assert_called_once()
 
 
+def test_get_previous_compatible_run():
+    db = Mock()
+
+    repository = EvaluationRepository(db)
+
+    current = Mock(
+        id=10,
+        dataset_name="rag-evaluation-v1",
+        llm_model="openai/gpt-oss-120b",
+        embedding_model="all-MiniLM-L6-v2",
+        total_cases=8,
+    )
+
+    previous = Mock()
+
+    (
+        db.query.return_value.filter.return_value.order_by.return_value.first.return_value
+    ) = previous
+
+    result = repository.get_previous_compatible_run(current)
+
+    assert result is previous
+
+    db.query.return_value.filter.assert_called_once()
+
+
 def test_list_runs_by_dataset():
     db = Mock()
 
@@ -487,12 +513,8 @@ def test_list_runs_with_limit():
     order_by_args = query.order_by.call_args.args
 
     assert len(order_by_args) == 2
-    assert str(order_by_args[0]) == str(
-        EvaluationRun.created_at.desc()
-    )
-    assert str(order_by_args[1]) == str(
-        EvaluationRun.id.desc()
-    )
+    assert str(order_by_args[0]) == str(EvaluationRun.created_at.desc())
+    assert str(order_by_args[1]) == str(EvaluationRun.id.desc())
 
     ordered_query.limit.assert_called_once_with(2)
 
@@ -526,12 +548,8 @@ def test_list_runs_without_limit():
     order_by_args = query.order_by.call_args.args
 
     assert len(order_by_args) == 2
-    assert str(order_by_args[0]) == str(
-        EvaluationRun.created_at.desc()
-    )
-    assert str(order_by_args[1]) == str(
-        EvaluationRun.id.desc()
-    )
+    assert str(order_by_args[0]) == str(EvaluationRun.created_at.desc())
+    assert str(order_by_args[1]) == str(EvaluationRun.id.desc())
 
     ordered_query.all.assert_called_once()
 

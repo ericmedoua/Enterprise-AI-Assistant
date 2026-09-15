@@ -10,11 +10,17 @@ def build_latest_evaluation_trends(
 ) -> list[EvaluationMetricTrend]:
     runs = repository.list_runs()
 
-    if len(runs) < 2:
+    if not runs:
         return []
 
     current = runs[0]
-    previous = runs[1]
+
+    previous = repository.get_previous_compatible_run(
+        current,
+    )
+
+    if previous is None:
+        return []
 
     return build_evaluation_trends(
         previous=previous,

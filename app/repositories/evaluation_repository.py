@@ -81,12 +81,9 @@ class EvaluationRepository:
         self,
         limit: int | None = None,
     ) -> list[EvaluationRun]:
-        query = (
-            self.db.query(EvaluationRun)
-            .order_by(
-                EvaluationRun.created_at.desc(),
-                EvaluationRun.id.desc(),
-            )
+        query = self.db.query(EvaluationRun).order_by(
+            EvaluationRun.created_at.desc(),
+            EvaluationRun.id.desc(),
         )
 
         if limit is not None:
@@ -137,6 +134,26 @@ class EvaluationRepository:
         return (
             self.db.query(EvaluationRun)
             .filter(EvaluationRun.id != current_run_id)
+            .order_by(
+                EvaluationRun.created_at.desc(),
+                EvaluationRun.id.desc(),
+            )
+            .first()
+        )
+
+    def get_previous_compatible_run(
+        self,
+        current_run: EvaluationRun,
+    ) -> EvaluationRun | None:
+        return (
+            self.db.query(EvaluationRun)
+            .filter(
+                EvaluationRun.id != current_run.id,
+                EvaluationRun.dataset_name == current_run.dataset_name,
+                EvaluationRun.llm_model == current_run.llm_model,
+                EvaluationRun.embedding_model == current_run.embedding_model,
+                EvaluationRun.total_cases == current_run.total_cases,
+            )
             .order_by(
                 EvaluationRun.created_at.desc(),
                 EvaluationRun.id.desc(),
@@ -313,4 +330,24 @@ class EvaluationRepository:
             self.db.query(EvaluationRun)
             .filter(EvaluationRun.status == EVALUATION_STATUS_CANCELLED)
             .count()
+        )
+
+    def get_previous_compatible_run(
+        self,
+        current_run: EvaluationRun,
+    ) -> EvaluationRun | None:
+        return (
+            self.db.query(EvaluationRun)
+            .filter(
+                EvaluationRun.id != current_run.id,
+                EvaluationRun.dataset_name == current_run.dataset_name,
+                EvaluationRun.llm_model == current_run.llm_model,
+                EvaluationRun.embedding_model == current_run.embedding_model,
+                EvaluationRun.total_cases == current_run.total_cases,
+            )
+            .order_by(
+                EvaluationRun.created_at.desc(),
+                EvaluationRun.id.desc(),
+            )
+            .first()
         )

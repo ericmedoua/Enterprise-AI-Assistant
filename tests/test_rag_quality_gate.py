@@ -1,3 +1,5 @@
+import pytest
+
 import json
 
 from app.ai.evaluation.benchmark import (
@@ -45,6 +47,7 @@ from app.ai.evaluation.evaluation_observability_logger import (
 )
 
 
+@pytest.mark.integration
 def test_real_rag_quality_gate():
     report = run_rag_evaluation_report(RAG_EVALUATION_DATASET)
 

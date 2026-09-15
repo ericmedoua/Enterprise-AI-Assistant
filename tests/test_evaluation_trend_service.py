@@ -58,8 +58,9 @@ def test_build_latest_evaluation_trends():
 
     repository.list_runs.return_value = [
         current,
-        previous,
     ]
+
+    repository.get_previous_compatible_run.return_value = previous
 
     result = build_latest_evaluation_trends(repository)
 
@@ -109,8 +110,9 @@ def test_build_latest_evaluation_trends_declining():
 
     repository.list_runs.return_value = [
         current,
-        previous,
     ]
+
+    repository.get_previous_compatible_run.return_value = previous
 
     result = build_latest_evaluation_trends(repository)
 
@@ -124,6 +126,8 @@ def test_build_latest_evaluation_trends_with_one_run():
         make_run(run_id=1),
     ]
 
+    repository.get_previous_compatible_run.return_value = None
+
     result = build_latest_evaluation_trends(repository)
 
     assert result == []
@@ -133,6 +137,22 @@ def test_build_latest_evaluation_trends_with_no_runs():
     repository = Mock()
 
     repository.list_runs.return_value = []
+
+    result = build_latest_evaluation_trends(repository)
+
+    assert result == []
+
+
+def test_build_latest_evaluation_trends_with_no_compatible_previous_run():
+    repository = Mock()
+
+    current = make_run(run_id=2)
+
+    repository.list_runs.return_value = [
+        current,
+    ]
+
+    repository.get_previous_compatible_run.return_value = None
 
     result = build_latest_evaluation_trends(repository)
 

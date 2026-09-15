@@ -74,6 +74,12 @@ def _extract_answer_sentences(answer: str) -> list[str]:
         flags=re.IGNORECASE,
     )[0]
 
+    answer = re.sub(
+        r"【[^】]*】",
+        "",
+        answer,
+    )
+
     sentences = []
 
     for line in answer.splitlines():

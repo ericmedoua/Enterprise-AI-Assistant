@@ -149,3 +149,12 @@ def test_reindeer_paraphrase_is_supported():
     )
 
     assert result.score == 1.0
+
+
+def test_inline_source_citation_is_ignored():
+    result = evaluate_groundedness(
+        "Rabbits like to eat carrots.【This Book Belongs To.pdf (Page 3)】",
+        "Rabbits hop quickly and love to munch on carrots.",
+    )
+
+    assert result.score == 1.0

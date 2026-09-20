@@ -2,7 +2,7 @@ from app.ai.evaluation.evaluation_dashboard_history import (
     EvaluationDashboardHistory,
 )
 from app.ai.evaluation.evaluation_historical_trend_service import (
-    build_evaluation_historical_trends,
+    build_evaluation_historical_trends_from_runs,
 )
 
 
@@ -17,9 +17,8 @@ def build_evaluation_dashboard_history(repository, limit: int | None = None):
             pass_rate=0.0,
             latest_run_id=None,
             latest_quality_gate_passed=None,
-            trends=build_evaluation_historical_trends(
-                repository,
-                limit=limit,
+            trends=build_evaluation_historical_trends_from_runs(
+                runs,
             ),
         )
 
@@ -30,9 +29,8 @@ def build_evaluation_dashboard_history(repository, limit: int | None = None):
 
     latest_run = runs[0]
 
-    trends = build_evaluation_historical_trends(
-        repository,
-        limit=limit,
+    trends = build_evaluation_historical_trends_from_runs(
+        runs,
     )
 
     return EvaluationDashboardHistory(

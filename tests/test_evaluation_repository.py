@@ -1,5 +1,8 @@
 from unittest.mock import Mock
 
+import pytest
+
+from app.core.constants import EVALUATION_STATUS_COMPLETED
 from app.repositories.evaluation_repository import (
     EvaluationRepository,
 )
@@ -521,6 +524,53 @@ def test_list_runs_with_limit():
     limited_query.all.assert_called_once()
 
 
+def test_list_runs_with_limit_and_offset():
+    db = Mock()
+
+    query = db.query.return_value
+    ordered_query = query.order_by.return_value
+    offset_query = ordered_query.offset.return_value
+    limited_query = offset_query.limit.return_value
+
+    runs = [
+        Mock(id=1),
+        Mock(id=0),
+    ]
+
+    limited_query.all.return_value = runs
+
+    repository = EvaluationRepository(db)
+
+    result = repository.list_runs(
+        limit=2,
+        offset=2,
+    )
+
+    assert result == runs
+
+    ordered_query.offset.assert_called_once_with(2)
+    offset_query.limit.assert_called_once_with(2)
+    limited_query.all.assert_called_once()
+
+
+def test_list_runs_with_zero_offset_does_not_call_offset():
+    db = Mock()
+
+    query = db.query.return_value
+    ordered_query = query.order_by.return_value
+
+    runs = [Mock(id=3)]
+
+    ordered_query.all.return_value = runs
+
+    repository = EvaluationRepository(db)
+
+    result = repository.list_runs(offset=0)
+
+    assert result == runs
+    ordered_query.offset.assert_not_called()
+
+
 def test_list_runs_without_limit():
     db = Mock()
 
@@ -573,3 +623,229 @@ def test_list_runs_with_zero_limit():
 
     ordered_query.limit.assert_called_once_with(0)
     limited_query.all.assert_called_once()
+
+
+def test_update_status_allows_queued_to_running():
+    db = Mock()
+
+    run = Mock(
+        id=10,
+        status="queued",
+        started_at=None,
+        completed_at=None,
+    )
+
+    db.get.return_value = run
+
+    repository = EvaluationRepository(db)
+
+    result = repository.update_status(
+        run_id=10,
+        status="running",
+    )
+
+    assert result is run
+    assert run.status == "running"
+    assert run.started_at is not None
+
+
+def test_update_status_rejects_completed_to_running():
+    db = Mock()
+
+    run = Mock(
+        id=10,
+        status="completed",
+        started_at=None,
+        completed_at=datetime.now(timezone.utc),
+    )
+
+    db.get.return_value = run
+
+    repository = EvaluationRepository(db)
+
+    with pytest.raises(ValueError, match="Invalid evaluation status transition"):
+        repository.update_status(
+            run_id=10,
+            status="running",
+        )
+
+    assert run.status == "completed"
+    db.commit.assert_not_called()
+
+
+def test_update_status_rejects_unknown_status():
+    db = Mock()
+
+    run = Mock(
+        id=10,
+        status="queued",
+        started_at=None,
+        completed_at=None,
+    )
+
+    db.get.return_value = run
+
+    repository = EvaluationRepository(db)
+
+    with pytest.raises(ValueError, match="Invalid evaluation status transition"):
+        repository.update_status(
+            run_id=10,
+            status="completed",
+        )
+
+    assert run.status == "queued"
+    db.commit.assert_not_called()
+
+
+def test_create_run_rejects_metric_above_one():
+    db = Mock()
+
+    repository = EvaluationRepository(db)
+
+    with pytest.raises(
+        ValueError,
+        match="retrieval_hit_rate must be between 0.0 and 1.0",
+    ):
+        repository.create_run(
+            dataset_name="rag-evaluation-v1",
+            llm_model="openai/gpt-oss-120b",
+            embedding_model="all-MiniLM-L6-v2",
+            git_commit="test-commit",
+            total_cases=2,
+            retrieval_hit_rate=1.1,
+            average_groundedness=1.0,
+            average_semantic_relevance=0.60,
+            average_source_count=1.0,
+            overall_pass_rate=1.0,
+            quality_gate_passed=True,
+        )
+
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+
+
+def test_update_results_rejects_negative_metric():
+    db = Mock()
+
+    run = Mock(
+        id=10,
+        status="running",
+        started_at=None,
+        completed_at=None,
+    )
+
+    db.get.return_value = run
+
+    repository = EvaluationRepository(db)
+
+    with pytest.raises(
+        ValueError,
+        match="average_groundedness must be between 0.0 and 1.0",
+    ):
+        repository.update_results(
+            run_id=10,
+            total_cases=2,
+            retrieval_hit_rate=1.0,
+            average_groundedness=-0.1,
+            average_semantic_relevance=0.60,
+            average_source_count=1.0,
+            overall_pass_rate=1.0,
+            quality_gate_passed=True,
+            status="completed",
+        )
+
+    db.commit.assert_not_called()
+
+
+def test_create_run_rejects_negative_source_count():
+    db = Mock()
+
+    repository = EvaluationRepository(db)
+
+    with pytest.raises(
+        ValueError,
+        match="average_source_count must be greater than or equal to 0",
+    ):
+        repository.create_run(
+            dataset_name="rag-evaluation-v1",
+            llm_model="openai/gpt-oss-120b",
+            embedding_model="all-MiniLM-L6-v2",
+            git_commit="test-commit",
+            total_cases=2,
+            retrieval_hit_rate=1.0,
+            average_groundedness=1.0,
+            average_semantic_relevance=0.60,
+            average_source_count=-1.0,
+            overall_pass_rate=1.0,
+            quality_gate_passed=True,
+        )
+
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+
+
+def test_update_results_rejects_zero_cases_for_completed_run():
+    db = Mock()
+
+    run = Mock(
+        id=10,
+        status="running",
+        started_at=None,
+        completed_at=None,
+    )
+
+    db.get.return_value = run
+
+    repository = EvaluationRepository(db)
+
+    with pytest.raises(
+        ValueError,
+        match="total_cases must be greater than 0",
+    ):
+        repository.update_results(
+            run_id=10,
+            total_cases=0,
+            retrieval_hit_rate=1.0,
+            average_groundedness=1.0,
+            average_semantic_relevance=0.60,
+            average_source_count=1.0,
+            overall_pass_rate=1.0,
+            quality_gate_passed=True,
+            status="completed",
+        )
+
+    db.commit.assert_not_called()
+
+
+def test_update_results_rejects_non_running_run():
+    db = Mock()
+
+    run = Mock(
+        id=10,
+        status="queued",
+        started_at=None,
+        completed_at=None,
+    )
+
+    db.get.return_value = run
+
+    repository = EvaluationRepository(db)
+
+    with pytest.raises(
+        ValueError,
+        match="Evaluation results can only be updated for running runs",
+    ):
+        repository.update_results(
+            run_id=10,
+            total_cases=2,
+            retrieval_hit_rate=1.0,
+            average_groundedness=1.0,
+            average_semantic_relevance=0.60,
+            average_source_count=1.0,
+            overall_pass_rate=1.0,
+            quality_gate_passed=True,
+            status=EVALUATION_STATUS_COMPLETED,
+        )
+
+    assert run.status == "queued"
+    db.commit.assert_not_called()

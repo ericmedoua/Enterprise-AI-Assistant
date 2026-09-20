@@ -2,6 +2,10 @@ from sqlalchemy.orm import Session
 
 from app.models.evaluation_run import EvaluationRun
 
+from app.ai.evaluation.stale_evaluation import (
+    is_evaluation_stale,
+)
+
 from app.ai.evaluation.evaluation_report import (
     EvaluationReport,
 )
@@ -18,9 +22,36 @@ from app.core.constants import (
     EVALUATION_STATUS_QUEUED,
     EVALUATION_STATUS_RUNNING,
 )
-from app.ai.evaluation.stale_evaluation import (
-    is_evaluation_stale,
-)
+
+EVALUATION_ALLOWED_TRANSITIONS = {
+    EVALUATION_STATUS_QUEUED: {
+        EVALUATION_STATUS_RUNNING,
+        EVALUATION_STATUS_CANCELLED,
+    },
+    EVALUATION_STATUS_RUNNING: {
+        EVALUATION_STATUS_COMPLETED,
+        EVALUATION_STATUS_FAILED,
+    },
+    EVALUATION_STATUS_COMPLETED: set(),
+    EVALUATION_STATUS_FAILED: set(),
+    EVALUATION_STATUS_CANCELLED: set(),
+}
+
+
+def _validate_metric_range(
+    metric_name: str,
+    value: float,
+) -> None:
+    if not 0.0 <= value <= 1.0:
+        raise ValueError(f"{metric_name} must be between 0.0 and 1.0.")
+
+
+def _validate_non_negative(
+    field_name: str,
+    value: float | int,
+) -> None:
+    if value < 0:
+        raise ValueError(f"{field_name} must be greater than or equal to 0.")
 
 
 class EvaluationRepository:
@@ -43,8 +74,29 @@ class EvaluationRepository:
         average_source_count: float,
         overall_pass_rate: float,
         quality_gate_passed: bool,
-        status: str = "completed",
+        status: str = EVALUATION_STATUS_COMPLETED,
     ) -> EvaluationRun:
+
+        _validate_metric_range(
+            "retrieval_hit_rate",
+            retrieval_hit_rate,
+        )
+        _validate_metric_range(
+            "average_groundedness",
+            average_groundedness,
+        )
+        _validate_metric_range(
+            "average_semantic_relevance",
+            average_semantic_relevance,
+        )
+        _validate_metric_range(
+            "overall_pass_rate",
+            overall_pass_rate,
+        )
+        _validate_non_negative(
+            "average_source_count",
+            average_source_count,
+        )
 
         evaluation_run = EvaluationRun(
             dataset_name=dataset_name,
@@ -80,11 +132,15 @@ class EvaluationRepository:
     def list_runs(
         self,
         limit: int | None = None,
+        offset: int = 0,
     ) -> list[EvaluationRun]:
         query = self.db.query(EvaluationRun).order_by(
             EvaluationRun.created_at.desc(),
             EvaluationRun.id.desc(),
         )
+
+        if offset:
+            query = query.offset(offset)
 
         if limit is not None:
             query = query.limit(limit)
@@ -215,6 +271,33 @@ class EvaluationRepository:
         if run is None:
             return None
 
+        if run.status != EVALUATION_STATUS_RUNNING:
+            raise ValueError("Evaluation results can only be updated for running runs.")
+
+        if status == EVALUATION_STATUS_COMPLETED and total_cases <= 0:
+            raise ValueError("total_cases must be greater than 0 for completed runs.")
+
+        _validate_metric_range(
+            "retrieval_hit_rate",
+            retrieval_hit_rate,
+        )
+        _validate_metric_range(
+            "average_groundedness",
+            average_groundedness,
+        )
+        _validate_metric_range(
+            "average_semantic_relevance",
+            average_semantic_relevance,
+        )
+        _validate_metric_range(
+            "overall_pass_rate",
+            overall_pass_rate,
+        )
+        _validate_non_negative(
+            "average_source_count",
+            average_source_count,
+        )
+
         run.total_cases = total_cases
         run.retrieval_hit_rate = retrieval_hit_rate
         run.average_groundedness = average_groundedness
@@ -247,6 +330,18 @@ class EvaluationRepository:
 
         if run is None:
             return None
+
+        allowed_statuses = EVALUATION_ALLOWED_TRANSITIONS.get(
+            run.status,
+        )
+
+        if allowed_statuses is None:
+            raise ValueError(f"Unknown current evaluation status: {run.status}")
+
+        if status not in allowed_statuses:
+            raise ValueError(
+                f"Invalid evaluation status transition: {run.status} -> {status}"
+            )
 
         now = datetime.now(timezone.utc)
 

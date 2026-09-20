@@ -203,12 +203,17 @@ def get_latest_evaluation(
 )
 def get_evaluation_history(
     db: Session = Depends(get_db),
+    limit: int = Query(default=10, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
 ):
     repository = EvaluationRepository(db)
 
-    runs = repository.list_runs()
+    runs = repository.list_runs(
+        limit=limit,
+        offset=offset,
+    )
 
-    return EvaluationHistoryResponse(runs=[_to_response(run) for run in runs])
+    return build_evaluation_history(runs)
 
 
 @router.get(
@@ -428,6 +433,7 @@ def get_evaluation_historical_trends(
     limit: int | None = Query(
         default=None,
         ge=1,
+        le=100,
     ),
     db: Session = Depends(get_db),
 ):
@@ -482,7 +488,11 @@ def get_evaluation_quality_health(
     response_model=EvaluationDashboardHistoryResponse,
 )
 def get_historical_evaluation_dashboard(
-    limit: int | None = Query(default=None, ge=1),
+    limit: int | None = Query(
+        default=None,
+        ge=1,
+        le=100,
+    ),
     db: Session = Depends(get_db),
 ):
     repository = EvaluationRepository(db)

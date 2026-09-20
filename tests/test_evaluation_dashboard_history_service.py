@@ -26,7 +26,7 @@ def test_build_evaluation_dashboard_history():
 
     with patch(
         "app.ai.evaluation.evaluation_dashboard_history_service."
-        "build_evaluation_historical_trends",
+        "build_evaluation_historical_trends_from_runs",
         return_value=trends,
     ):
         history = build_evaluation_dashboard_history(repository)
@@ -55,7 +55,7 @@ def test_build_evaluation_dashboard_history_with_limit():
 
     with patch(
         "app.ai.evaluation.evaluation_dashboard_history_service."
-        "build_evaluation_historical_trends",
+        "build_evaluation_historical_trends_from_runs",
         return_value=trends,
     ):
         history = build_evaluation_dashboard_history(
@@ -81,7 +81,7 @@ def test_build_evaluation_dashboard_history_with_no_runs():
 
     with patch(
         "app.ai.evaluation.evaluation_dashboard_history_service."
-        "build_evaluation_historical_trends",
+        "build_evaluation_historical_trends_from_runs",
         return_value=trends,
     ):
         history = build_evaluation_dashboard_history(repository)

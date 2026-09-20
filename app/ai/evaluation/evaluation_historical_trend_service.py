@@ -5,6 +5,12 @@ from app.ai.evaluation.evaluation_historical_trends import (
 from app.repositories.evaluation_repository import EvaluationRepository
 
 
+def build_evaluation_historical_trends_from_runs(
+    runs,
+) -> list[EvaluationHistoricalTrend]:
+    return build_historical_evaluation_trends(runs)
+
+
 def build_evaluation_historical_trends(
     repository: EvaluationRepository,
     limit: int | None = None,
@@ -13,4 +19,4 @@ def build_evaluation_historical_trends(
         limit=limit,
     )
 
-    return build_historical_evaluation_trends(runs)
+    return build_evaluation_historical_trends_from_runs(runs)

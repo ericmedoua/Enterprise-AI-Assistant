@@ -1,13 +1,57 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, Integer, String
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    Float,
+    Index,
+    Integer,
+    String,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.base import Base
+from app.core.constants import EVALUATION_STATUS_COMPLETED
 
 
 class EvaluationRun(Base):
     __tablename__ = "evaluation_runs"
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('queued', 'running', 'completed', 'failed', 'cancelled')",
+            name="ck_evaluation_runs_status",
+        ),
+        CheckConstraint(
+            "retrieval_hit_rate >= 0.0 AND retrieval_hit_rate <= 1.0",
+            name="ck_evaluation_runs_retrieval_hit_rate",
+        ),
+        CheckConstraint(
+            "average_groundedness >= 0.0 AND average_groundedness <= 1.0",
+            name="ck_evaluation_runs_groundedness",
+        ),
+        CheckConstraint(
+            "average_semantic_relevance >= 0.0 AND average_semantic_relevance <= 1.0",
+            name="ck_evaluation_runs_semantic_relevance",
+        ),
+        CheckConstraint(
+            "average_source_count >= 0.0",
+            name="ck_evaluation_runs_average_source_count",
+        ),
+        CheckConstraint(
+            "overall_pass_rate >= 0.0 AND overall_pass_rate <= 1.0",
+            name="ck_evaluation_runs_overall_pass_rate",
+        ),
+        CheckConstraint(
+            "total_cases >= 0",
+            name="ck_evaluation_runs_total_cases",
+        ),
+        CheckConstraint(
+            "completed_at IS NULL OR started_at IS NULL OR completed_at >= started_at",
+            name="ck_evaluation_runs_timestamp_order",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(
         Integer,
@@ -79,7 +123,7 @@ class EvaluationRun(Base):
     status: Mapped[str] = mapped_column(
         String(20),
         nullable=False,
-        default="completed",
+        default=EVALUATION_STATUS_COMPLETED,
     )
 
     started_at: Mapped[datetime | None] = mapped_column(
@@ -91,3 +135,20 @@ class EvaluationRun(Base):
         DateTime(),
         nullable=True,
     )
+
+
+Index(
+    "ix_evaluation_runs_created_at_id",
+    EvaluationRun.created_at.desc(),
+    EvaluationRun.id.desc(),
+)
+
+Index(
+    "ix_evaluation_runs_compatibility",
+    EvaluationRun.dataset_name,
+    EvaluationRun.llm_model,
+    EvaluationRun.embedding_model,
+    EvaluationRun.total_cases,
+    EvaluationRun.created_at.desc(),
+    EvaluationRun.id.desc(),
+)

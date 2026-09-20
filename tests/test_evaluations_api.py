@@ -112,7 +112,12 @@ def test_get_evaluation_history(
 
     mock_repository.return_value.list_runs.return_value = runs
 
-    response = client.get("/api/v1/evaluations/history")
+    response = client.get("/api/v1/evaluations/history?limit=2&offset=2")
+
+    mock_repository.return_value.list_runs.assert_called_once_with(
+        limit=2,
+        offset=2,
+    )
 
     assert response.status_code == 200
 
@@ -127,6 +132,24 @@ def test_get_evaluation_history(
 
     assert data["runs"][1]["id"] == 1
     assert data["runs"][1]["status"] == "completed"
+
+
+def test_get_evaluation_history_rejects_zero_limit():
+    response = client.get("/api/v1/evaluations/history?limit=0")
+
+    assert response.status_code == 422
+
+
+def test_get_evaluation_history_rejects_limit_over_100():
+    response = client.get("/api/v1/evaluations/history?limit=101")
+
+    assert response.status_code == 422
+
+
+def test_get_evaluation_history_rejects_negative_offset():
+    response = client.get("/api/v1/evaluations/history?offset=-1")
+
+    assert response.status_code == 422
 
 
 @patch("app.api.evaluations.EvaluationRepository")
@@ -1481,6 +1504,14 @@ def test_get_historical_evaluation_dashboard_with_limit():
 
     _, kwargs = mock_build_history.call_args
     assert kwargs["limit"] == 10
+
+
+def test_get_historical_evaluation_dashboard_rejects_limit_over_100():
+    client = TestClient(app)
+
+    response = client.get("/api/v1/evaluations/historical-dashboard?limit=101")
+
+    assert response.status_code == 422
 
 
 def test_get_historical_evaluation_dashboard_with_no_runs():

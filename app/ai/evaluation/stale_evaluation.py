@@ -1,12 +1,14 @@
 from datetime import datetime, timedelta, timezone
 
+from app.core.constants import EVALUATION_STATUS_RUNNING
+
 
 def is_evaluation_stale(
     status: str,
     started_at: datetime | None,
     timeout_seconds: int = 300,
 ) -> bool:
-    if status != "running":
+    if status != EVALUATION_STATUS_RUNNING:
         return False
 
     if started_at is None:

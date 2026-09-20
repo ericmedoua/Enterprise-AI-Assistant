@@ -1,7 +1,14 @@
+import pytest
+
+from sqlalchemy.exc import IntegrityError
+
+from app.models.evaluation_run import EvaluationRun
 from app.database.session import SessionLocal
 from app.repositories.evaluation_repository import (
     EvaluationRepository,
 )
+
+pytestmark = pytest.mark.integration
 
 
 def test_create_and_read_evaluation_run():
@@ -183,6 +190,66 @@ def test_get_previous_run():
         db.delete(first)
         db.delete(second)
         db.commit()
+
+    finally:
+        db.close()
+
+
+def test_database_rejects_invalid_retrieval_hit_rate():
+    db = SessionLocal()
+
+    try:
+        invalid_run = EvaluationRun(
+            dataset_name="constraint-test",
+            llm_model="openai/gpt-oss-120b",
+            embedding_model="all-MiniLM-L6-v2",
+            git_commit="test-commit",
+            total_cases=2,
+            retrieval_hit_rate=1.5,
+            average_groundedness=1.0,
+            average_semantic_relevance=0.60,
+            average_source_count=1.0,
+            overall_pass_rate=1.0,
+            quality_gate_passed=True,
+            status="completed",
+        )
+
+        db.add(invalid_run)
+
+        with pytest.raises(IntegrityError):
+            db.flush()
+
+        db.rollback()
+
+    finally:
+        db.close()
+
+
+def test_database_rejects_invalid_evaluation_status():
+    db = SessionLocal()
+
+    try:
+        invalid_run = EvaluationRun(
+            dataset_name="constraint-test",
+            llm_model="openai/gpt-oss-120b",
+            embedding_model="all-MiniLM-L6-v2",
+            git_commit="test-commit",
+            total_cases=2,
+            retrieval_hit_rate=1.0,
+            average_groundedness=1.0,
+            average_semantic_relevance=0.60,
+            average_source_count=1.0,
+            overall_pass_rate=1.0,
+            quality_gate_passed=True,
+            status="invalid-status",
+        )
+
+        db.add(invalid_run)
+
+        with pytest.raises(IntegrityError):
+            db.flush()
+
+        db.rollback()
 
     finally:
         db.close()

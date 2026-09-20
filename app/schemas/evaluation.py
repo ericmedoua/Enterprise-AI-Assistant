@@ -27,8 +27,17 @@ class EvaluationRunResponse(BaseModel):
     quality_gate_passed: bool
 
 
+class EvaluationHistoryPagination(BaseModel):
+    limit: int
+    offset: int
+    total: int
+    has_next: bool
+    has_previous: bool
+
+
 class EvaluationHistoryResponse(BaseModel):
     runs: list[EvaluationRunResponse]
+    pagination: EvaluationHistoryPagination | None = None
 
 
 class EvaluationComparisonResponse(BaseModel):

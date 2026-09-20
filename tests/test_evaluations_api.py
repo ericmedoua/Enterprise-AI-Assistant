@@ -111,6 +111,7 @@ def test_get_evaluation_history(
     ]
 
     mock_repository.return_value.list_runs.return_value = runs
+    mock_repository.return_value.count_runs.return_value = 5
 
     response = client.get("/api/v1/evaluations/history?limit=2&offset=2")
 
@@ -132,6 +133,14 @@ def test_get_evaluation_history(
 
     assert data["runs"][1]["id"] == 1
     assert data["runs"][1]["status"] == "completed"
+
+    assert data["pagination"]["limit"] == 2
+    assert data["pagination"]["offset"] == 2
+    assert data["pagination"]["total"] == 5
+    assert data["pagination"]["has_next"] is True
+    assert data["pagination"]["has_previous"] is True
+
+    mock_repository.return_value.count_runs.assert_called_once()
 
 
 def test_get_evaluation_history_rejects_zero_limit():

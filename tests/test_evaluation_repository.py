@@ -849,3 +849,19 @@ def test_update_results_rejects_non_running_run():
 
     assert run.status == "queued"
     db.commit.assert_not_called()
+
+
+def test_count_runs():
+    db = Mock()
+
+    query = db.query.return_value
+    query.count.return_value = 5
+
+    repository = EvaluationRepository(db)
+
+    result = repository.count_runs()
+
+    assert result == 5
+
+    db.query.assert_called_once_with(EvaluationRun)
+    query.count.assert_called_once()

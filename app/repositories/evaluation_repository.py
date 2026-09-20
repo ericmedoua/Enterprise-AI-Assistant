@@ -147,6 +147,9 @@ class EvaluationRepository:
 
         return query.all()
 
+    def count_runs(self) -> int:
+        return self.db.query(EvaluationRun).count()
+
     def create_run_from_report(
         self,
         dataset_name: str,

@@ -208,12 +208,19 @@ def get_evaluation_history(
 ):
     repository = EvaluationRepository(db)
 
+    total = repository.count_runs()
+
     runs = repository.list_runs(
         limit=limit,
         offset=offset,
     )
 
-    return build_evaluation_history(runs)
+    return build_evaluation_history(
+        runs,
+        limit=limit,
+        offset=offset,
+        total=total,
+    )
 
 
 @router.get(

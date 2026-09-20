@@ -166,3 +166,23 @@ def test_build_evaluation_history_running_run():
     assert len(result.runs) == 1
     assert result.runs[0].status == "running"
     assert result.runs[0].duration_seconds is None
+
+
+def test_build_evaluation_history_with_pagination():
+    runs = [
+        make_run(3),
+    ]
+
+    result = build_evaluation_history(
+        runs,
+        limit=1,
+        offset=2,
+        total=5,
+    )
+
+    assert result.pagination is not None
+    assert result.pagination.limit == 1
+    assert result.pagination.offset == 2
+    assert result.pagination.total == 5
+    assert result.pagination.has_next is True
+    assert result.pagination.has_previous is True

@@ -12,6 +12,7 @@ from app.ai.evaluation.evaluation_duration import (
 )
 from app.models.evaluation_run import EvaluationRun
 from app.schemas.evaluation import (
+    EvaluationHistoryPagination,
     EvaluationHistoryResponse,
     EvaluationRunResponse,
 )
@@ -44,6 +45,10 @@ def compare_latest_runs(
 
 def build_evaluation_history(
     runs: list[EvaluationRun],
+    *,
+    limit: int | None = None,
+    offset: int = 0,
+    total: int | None = None,
 ) -> EvaluationHistoryResponse:
     responses = [
         EvaluationRunResponse(
@@ -71,6 +76,18 @@ def build_evaluation_history(
         for run in runs
     ]
 
+    pagination = None
+
+    if limit is not None and total is not None:
+        pagination = EvaluationHistoryPagination(
+            limit=limit,
+            offset=offset,
+            total=total,
+            has_next=offset + len(responses) < total,
+            has_previous=offset > 0,
+        )
+
     return EvaluationHistoryResponse(
         runs=responses,
+        pagination=pagination,
     )

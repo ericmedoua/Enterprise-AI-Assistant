@@ -74,6 +74,12 @@ def _extract_answer_sentences(answer: str) -> list[str]:
         flags=re.IGNORECASE,
     )[0]
 
+    answer = re.split(
+        r"(?im)^\s*(?:\*\*|__)?sources?(?:\*\*|__)?\s*:?\s*$",
+        answer,
+        maxsplit=1,
+    )[0]
+
     answer = re.sub(
         r"【[^】]*】",
         "",

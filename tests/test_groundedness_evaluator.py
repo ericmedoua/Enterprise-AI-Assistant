@@ -158,3 +158,32 @@ def test_inline_source_citation_is_ignored():
     )
 
     assert result.score == 1.0
+
+
+def test_markdown_sources_heading_is_ignored():
+    result = evaluate_groundedness(
+        "- Ducks have **webbed feet**, which enable them to swim.\n\n"
+        "**Sources**\n"
+        "- This Book Belongs To.pdf (Page 11)\n"
+        "- This Book Belongs To.pdf (Page 95)\n"
+        "- This Book Belongs To.pdf (Page 71)\n"
+        "- This Book Belongs To.pdf (Page 77)",
+        "Ducks have webbed feet and can swim in ponds.\nDuck",
+    )
+
+    assert result.score == 1.0
+    assert result.supported_sentences == 1
+    assert result.total_sentences == 1
+
+
+def test_markdown_sources_heading_is_ignored_for_giraffe():
+    result = evaluate_groundedness(
+        "- Giraffes have **very long necks** that allow them to reach tall trees.\n\n"
+        "**Sources**\n"
+        "- This Book Belongs To.pdf (Page 25)",
+        "Giraffes have very long necks to reach tall trees.\nGiraffe",
+    )
+
+    assert result.score == 1.0
+    assert result.supported_sentences == 1
+    assert result.total_sentences == 1

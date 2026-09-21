@@ -12,6 +12,21 @@ jobs:
   rag-quality:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: enterprise_ai_assistant
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d enterprise_ai_assistant"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
       APP_NAME: enterprise-ai-assistant
       API_VERSION: v1
@@ -50,6 +65,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      - name: Run database migrations
+        run: |
+          alembic upgrade head    
 
       - name: Prepare embedding model
         run: |

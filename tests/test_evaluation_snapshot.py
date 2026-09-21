@@ -16,6 +16,7 @@ from app.ai.evaluation.evaluation_snapshot_report import (
 
 from app.ai.evaluation.quality_gate import (
     QualityGateResult,
+    evaluate_quality_gate,
 )
 
 
@@ -130,3 +131,43 @@ def test_snapshot_to_dict():
     assert data["quality_gate"]["passed"] is True
 
     assert data["comparison"] is None
+
+
+def test_evaluation_snapshot_contains_quality_gate_failures():
+    report = EvaluationReport(
+        total_cases=2,
+        retrieval_hit_rate=0.80,
+        average_groundedness=0.75,
+        average_semantic_relevance=0.40,
+        average_source_count=1.0,
+        overall_pass_rate=0.50,
+    )
+
+    quality_gate = evaluate_quality_gate(report)
+
+    snapshot = EvaluationSnapshot(
+        dataset_name="rag-evaluation-v1",
+        report=report,
+        quality_gate=quality_gate,
+        comparison=None,
+    )
+
+    data = snapshot.to_dict()
+
+    assert data["quality_gate"]["passed"] is False
+
+    failures = data["quality_gate"]["failures"]
+
+    assert len(failures) == 4
+
+    assert failures[0] == {
+        "metric_name": "retrieval_hit_rate",
+        "actual_value": 0.80,
+        "required_value": 1.0,
+    }
+
+    assert failures[1] == {
+        "metric_name": "average_groundedness",
+        "actual_value": 0.75,
+        "required_value": 0.90,
+    }

@@ -101,3 +101,40 @@ def test_custom_quality_thresholds():
     )
 
     assert result.passed is True
+
+
+def test_quality_gate_reports_failed_metrics():
+    report = make_report(
+        retrieval=0.80,
+        groundedness=0.75,
+        relevance=0.40,
+        overall=0.50,
+    )
+
+    result = evaluate_quality_gate(report)
+
+    assert result.passed is False
+    assert len(result.failures) == 4
+
+    assert result.failures[0].metric_name == "retrieval_hit_rate"
+    assert result.failures[0].actual_value == 0.80
+    assert result.failures[0].required_value == 1.0
+
+    assert result.failures[1].metric_name == "average_groundedness"
+    assert result.failures[1].actual_value == 0.75
+    assert result.failures[1].required_value == 0.90
+
+    assert result.failures[2].metric_name == "average_semantic_relevance"
+    assert result.failures[2].actual_value == 0.40
+    assert result.failures[2].required_value == 0.50
+
+    assert result.failures[3].metric_name == "overall_pass_rate"
+    assert result.failures[3].actual_value == 0.50
+    assert result.failures[3].required_value == 1.0
+
+
+def test_quality_gate_has_no_failures_when_passing():
+    result = evaluate_quality_gate(make_report())
+
+    assert result.passed is True
+    assert result.failures == ()

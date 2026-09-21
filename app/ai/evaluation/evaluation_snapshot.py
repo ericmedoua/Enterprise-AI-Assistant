@@ -39,6 +39,14 @@ class EvaluationSnapshot:
                     self.quality_gate.semantic_relevance_passed
                 ),
                 "overall_passed": (self.quality_gate.overall_passed),
+                "failures": [
+                    {
+                        "metric_name": failure.metric_name,
+                        "actual_value": failure.actual_value,
+                        "required_value": failure.required_value,
+                    }
+                    for failure in self.quality_gate.failures
+                ],
             },
             "comparison": None,
         }

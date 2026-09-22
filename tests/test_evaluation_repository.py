@@ -865,3 +865,77 @@ def test_count_runs():
 
     db.query.assert_called_once_with(EvaluationRun)
     query.count.assert_called_once()
+
+
+def test_list_runs_with_dataset_filter():
+    db = Mock()
+
+    query = db.query.return_value
+    filtered_query = query.filter.return_value
+    ordered_query = filtered_query.order_by.return_value
+
+    runs = [Mock(id=5)]
+    ordered_query.all.return_value = runs
+
+    repository = EvaluationRepository(db)
+
+    result = repository.list_runs(
+        dataset_name="rag-evaluation-v1",
+    )
+
+    assert result == runs
+
+    query.filter.assert_called_once()
+    ordered_query.all.assert_called_once()
+
+
+def test_list_runs_with_multiple_filters():
+    db = Mock()
+
+    query = db.query.return_value
+    filtered_once = query.filter.return_value
+    filtered_twice = filtered_once.filter.return_value
+    filtered_thrice = filtered_twice.filter.return_value
+    ordered_query = filtered_thrice.order_by.return_value
+
+    runs = [Mock(id=7)]
+    ordered_query.all.return_value = runs
+
+    repository = EvaluationRepository(db)
+
+    result = repository.list_runs(
+        dataset_name="rag-evaluation-v1",
+        status="completed",
+        quality_gate_passed=True,
+    )
+
+    assert result == runs
+
+    query.filter.assert_called_once()
+    filtered_once.filter.assert_called_once()
+    filtered_twice.filter.assert_called_once()
+    ordered_query.all.assert_called_once()
+
+
+def test_count_runs_with_filters():
+    db = Mock()
+
+    query = db.query.return_value
+    filtered_query = query.filter.return_value
+
+    filtered_query.filter.return_value = filtered_query
+    filtered_query.count.return_value = 12
+
+    repository = EvaluationRepository(db)
+
+    result = repository.count_runs(
+        dataset_name="rag-evaluation-v1",
+        status="completed",
+        quality_gate_passed=True,
+    )
+
+    assert result == 12
+
+    query.filter.assert_called_once()
+    filtered_query.filter.assert_called()
+    filtered_query.count.assert_called_once()

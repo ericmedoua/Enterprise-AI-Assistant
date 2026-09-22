@@ -111,13 +111,36 @@ def test_get_evaluation_history(
     ]
 
     mock_repository.return_value.list_runs.return_value = runs
+
     mock_repository.return_value.count_runs.return_value = 5
 
-    response = client.get("/api/v1/evaluations/history?limit=2&offset=2")
+    response = client.get(
+        "/api/v1/evaluations/history"
+        "?limit=2"
+        "&offset=2"
+        "&dataset_name=rag-evaluation-v1"
+        "&llm_model=openai/gpt-oss-120b"
+        "&embedding_model=all-MiniLM-L6-v2"
+        "&status=completed"
+        "&quality_gate_passed=true"
+    )
 
     mock_repository.return_value.list_runs.assert_called_once_with(
         limit=2,
         offset=2,
+        dataset_name="rag-evaluation-v1",
+        llm_model="openai/gpt-oss-120b",
+        embedding_model="all-MiniLM-L6-v2",
+        status="completed",
+        quality_gate_passed=True,
+    )
+
+    mock_repository.return_value.count_runs.assert_called_once_with(
+        dataset_name="rag-evaluation-v1",
+        llm_model="openai/gpt-oss-120b",
+        embedding_model="all-MiniLM-L6-v2",
+        status="completed",
+        quality_gate_passed=True,
     )
 
     assert response.status_code == 200
@@ -133,6 +156,12 @@ def test_get_evaluation_history(
 
     assert data["runs"][1]["id"] == 1
     assert data["runs"][1]["status"] == "completed"
+
+    assert data["pagination"]["limit"] == 2
+    assert data["pagination"]["offset"] == 2
+    assert data["pagination"]["total"] == 5
+    assert data["pagination"]["has_next"] is True
+    assert data["pagination"]["has_previous"] is True
 
     assert data["pagination"]["limit"] == 2
     assert data["pagination"]["offset"] == 2
@@ -1821,3 +1850,53 @@ def test_get_evaluation_deployment_readiness_no_evaluation():
     assert data["ready"] is False
     assert data["status"] == "blocked"
     assert data["reason"] == ("No evaluation run is available.")
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_history_with_quality_gate_filter(
+    mock_repository,
+):
+    mock_repository.return_value.count_runs.return_value = 2
+    mock_repository.return_value.list_runs.return_value = []
+
+    response = client.get("/api/v1/evaluations/history?quality_gate_passed=false")
+
+    assert response.status_code == 200
+
+    mock_repository.return_value.count_runs.assert_called_once_with(
+        dataset_name=None,
+        llm_model=None,
+        embedding_model=None,
+        status=None,
+        quality_gate_passed=False,
+    )
+
+    mock_repository.return_value.list_runs.assert_called_once_with(
+        limit=10,
+        offset=0,
+        dataset_name=None,
+        llm_model=None,
+        embedding_model=None,
+        status=None,
+        quality_gate_passed=False,
+    )
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_history_with_status_filter(
+    mock_repository,
+):
+    mock_repository.return_value.count_runs.return_value = 3
+    mock_repository.return_value.list_runs.return_value = []
+
+    response = client.get("/api/v1/evaluations/history?status=failed")
+
+    assert response.status_code == 200
+
+    mock_repository.return_value.count_runs.assert_called_once_with(
+        dataset_name=None,
+        llm_model=None,
+        embedding_model=None,
+        status="failed",
+        quality_gate_passed=None,
+    )

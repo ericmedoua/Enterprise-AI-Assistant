@@ -205,14 +205,30 @@ def get_evaluation_history(
     db: Session = Depends(get_db),
     limit: int = Query(default=10, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    dataset_name: str | None = Query(default=None),
+    llm_model: str | None = Query(default=None),
+    embedding_model: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    quality_gate_passed: bool | None = Query(default=None),
 ):
     repository = EvaluationRepository(db)
 
-    total = repository.count_runs()
+    total = repository.count_runs(
+        dataset_name=dataset_name,
+        llm_model=llm_model,
+        embedding_model=embedding_model,
+        status=status,
+        quality_gate_passed=quality_gate_passed,
+    )
 
     runs = repository.list_runs(
         limit=limit,
         offset=offset,
+        dataset_name=dataset_name,
+        llm_model=llm_model,
+        embedding_model=embedding_model,
+        status=status,
+        quality_gate_passed=quality_gate_passed,
     )
 
     return build_evaluation_history(

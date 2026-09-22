@@ -133,8 +133,19 @@ class EvaluationRepository:
         self,
         limit: int | None = None,
         offset: int = 0,
+        dataset_name: str | None = None,
+        llm_model: str | None = None,
+        embedding_model: str | None = None,
+        status: str | None = None,
+        quality_gate_passed: bool | None = None,
     ) -> list[EvaluationRun]:
-        query = self.db.query(EvaluationRun).order_by(
+        query = self._build_runs_query(
+            dataset_name=dataset_name,
+            llm_model=llm_model,
+            embedding_model=embedding_model,
+            status=status,
+            quality_gate_passed=quality_gate_passed,
+        ).order_by(
             EvaluationRun.created_at.desc(),
             EvaluationRun.id.desc(),
         )
@@ -147,8 +158,60 @@ class EvaluationRepository:
 
         return query.all()
 
-    def count_runs(self) -> int:
-        return self.db.query(EvaluationRun).count()
+    def _build_runs_query(
+        self,
+        dataset_name: str | None = None,
+        llm_model: str | None = None,
+        embedding_model: str | None = None,
+        status: str | None = None,
+        quality_gate_passed: bool | None = None,
+    ):
+        query = self.db.query(EvaluationRun)
+
+        if dataset_name is not None:
+            query = query.filter(
+                EvaluationRun.dataset_name == dataset_name,
+            )
+
+        if llm_model is not None:
+            query = query.filter(
+                EvaluationRun.llm_model == llm_model,
+            )
+
+        if embedding_model is not None:
+            query = query.filter(
+                EvaluationRun.embedding_model == embedding_model,
+            )
+
+        if status is not None:
+            query = query.filter(
+                EvaluationRun.status == status,
+            )
+
+        if quality_gate_passed is not None:
+            query = query.filter(
+                EvaluationRun.quality_gate_passed == quality_gate_passed,
+            )
+
+        return query
+
+    def count_runs(
+        self,
+        dataset_name: str | None = None,
+        llm_model: str | None = None,
+        embedding_model: str | None = None,
+        status: str | None = None,
+        quality_gate_passed: bool | None = None,
+    ) -> int:
+        query = self._build_runs_query(
+            dataset_name=dataset_name,
+            llm_model=llm_model,
+            embedding_model=embedding_model,
+            status=status,
+            quality_gate_passed=quality_gate_passed,
+        )
+
+        return query.count()
 
     def create_run_from_report(
         self,

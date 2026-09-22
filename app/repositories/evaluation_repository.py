@@ -37,6 +37,15 @@ EVALUATION_ALLOWED_TRANSITIONS = {
     EVALUATION_STATUS_CANCELLED: set(),
 }
 
+EVALUATION_HISTORY_SORT_FIELDS = {
+    "created_at": EvaluationRun.created_at,
+    "total_cases": EvaluationRun.total_cases,
+    "retrieval_hit_rate": EvaluationRun.retrieval_hit_rate,
+    "average_groundedness": EvaluationRun.average_groundedness,
+    "average_semantic_relevance": EvaluationRun.average_semantic_relevance,
+    "overall_pass_rate": EvaluationRun.overall_pass_rate,
+}
+
 
 def _validate_metric_range(
     metric_name: str,
@@ -138,16 +147,44 @@ class EvaluationRepository:
         embedding_model: str | None = None,
         status: str | None = None,
         quality_gate_passed: bool | None = None,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
     ) -> list[EvaluationRun]:
+        if sort_by not in EVALUATION_HISTORY_SORT_FIELDS:
+            raise ValueError(f"Unsupported evaluation history sort field: {sort_by}")
+
+        if sort_order not in {"asc", "desc"}:
+            raise ValueError(f"Unsupported evaluation history sort order: {sort_order}")
+
         query = self._build_runs_query(
             dataset_name=dataset_name,
             llm_model=llm_model,
             embedding_model=embedding_model,
             status=status,
             quality_gate_passed=quality_gate_passed,
-        ).order_by(
-            EvaluationRun.created_at.desc(),
-            EvaluationRun.id.desc(),
+        )
+
+        sort_column = EVALUATION_HISTORY_SORT_FIELDS[sort_by]
+
+        if sort_order == "asc":
+            primary_order = sort_column.asc()
+        else:
+            primary_order = sort_column.desc()
+
+        if sort_by == "created_at":
+            order_by_clauses = [
+                primary_order,
+                EvaluationRun.id.desc(),
+            ]
+        else:
+            order_by_clauses = [
+                primary_order,
+                EvaluationRun.created_at.desc(),
+                EvaluationRun.id.desc(),
+            ]
+
+        query = query.order_by(
+            *order_by_clauses,
         )
 
         if offset:

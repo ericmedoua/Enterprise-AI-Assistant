@@ -123,6 +123,8 @@ def test_get_evaluation_history(
         "&embedding_model=all-MiniLM-L6-v2"
         "&status=completed"
         "&quality_gate_passed=true"
+        "&sort_by=average_groundedness"
+        "&sort_order=asc"
     )
 
     mock_repository.return_value.list_runs.assert_called_once_with(
@@ -133,6 +135,8 @@ def test_get_evaluation_history(
         embedding_model="all-MiniLM-L6-v2",
         status="completed",
         quality_gate_passed=True,
+        sort_by="average_groundedness",
+        sort_order="asc",
     )
 
     mock_repository.return_value.count_runs.assert_called_once_with(
@@ -172,6 +176,18 @@ def test_get_evaluation_history(
     mock_repository.return_value.count_runs.assert_called_once()
 
 
+def test_get_evaluation_history_rejects_invalid_sort_by():
+    response = client.get("/api/v1/evaluations/history?sort_by=invalid_metric")
+
+    assert response.status_code == 422
+
+
+def test_get_evaluation_history_rejects_invalid_sort_order():
+    response = client.get("/api/v1/evaluations/history?sort_order=sideways")
+
+    assert response.status_code == 422
+
+
 def test_get_evaluation_history_rejects_zero_limit():
     response = client.get("/api/v1/evaluations/history?limit=0")
 
@@ -188,6 +204,30 @@ def test_get_evaluation_history_rejects_negative_offset():
     response = client.get("/api/v1/evaluations/history?offset=-1")
 
     assert response.status_code == 422
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_history_uses_default_sorting(
+    mock_repository,
+):
+    mock_repository.return_value.count_runs.return_value = 0
+    mock_repository.return_value.list_runs.return_value = []
+
+    response = client.get("/api/v1/evaluations/history")
+
+    assert response.status_code == 200
+
+    mock_repository.return_value.list_runs.assert_called_once_with(
+        limit=10,
+        offset=0,
+        dataset_name=None,
+        llm_model=None,
+        embedding_model=None,
+        status=None,
+        quality_gate_passed=None,
+        sort_by="created_at",
+        sort_order="desc",
+    )
 
 
 @patch("app.api.evaluations.EvaluationRepository")
@@ -1879,6 +1919,8 @@ def test_get_evaluation_history_with_quality_gate_filter(
         embedding_model=None,
         status=None,
         quality_gate_passed=False,
+        sort_by="created_at",
+        sort_order="desc",
     )
 
 
@@ -1899,4 +1941,46 @@ def test_get_evaluation_history_with_status_filter(
         embedding_model=None,
         status="failed",
         quality_gate_passed=None,
+    )
+
+
+@pytest.mark.parametrize(
+    "sort_by",
+    [
+        "created_at",
+        "total_cases",
+        "retrieval_hit_rate",
+        "average_groundedness",
+        "average_semantic_relevance",
+        "overall_pass_rate",
+    ],
+)
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_history_accepts_supported_sort_fields(
+    mock_repository,
+    sort_by,
+):
+    mock_repository.return_value.count_runs.return_value = 0
+    mock_repository.return_value.list_runs.return_value = []
+
+    response = client.get(
+        "/api/v1/evaluations/history",
+        params={
+            "sort_by": sort_by,
+            "sort_order": "desc",
+        },
+    )
+
+    assert response.status_code == 200
+
+    mock_repository.return_value.list_runs.assert_called_once_with(
+        limit=10,
+        offset=0,
+        dataset_name=None,
+        llm_model=None,
+        embedding_model=None,
+        status=None,
+        quality_gate_passed=None,
+        sort_by=sort_by,
+        sort_order="desc",
     )

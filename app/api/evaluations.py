@@ -6,7 +6,7 @@ from app.database.session import get_db
 from app.repositories.evaluation_repository import (
     EvaluationRepository,
 )
-
+from typing import Literal
 from app.schemas.evaluation import (
     EvaluationHistoryResponse,
     EvaluationObservabilityResponse,
@@ -210,6 +210,15 @@ def get_evaluation_history(
     embedding_model: str | None = Query(default=None),
     status: str | None = Query(default=None),
     quality_gate_passed: bool | None = Query(default=None),
+    sort_by: Literal[
+        "created_at",
+        "total_cases",
+        "retrieval_hit_rate",
+        "average_groundedness",
+        "average_semantic_relevance",
+        "overall_pass_rate",
+    ] = Query(default="created_at"),
+    sort_order: Literal["asc", "desc"] = Query(default="desc"),
 ):
     repository = EvaluationRepository(db)
 
@@ -229,6 +238,8 @@ def get_evaluation_history(
         embedding_model=embedding_model,
         status=status,
         quality_gate_passed=quality_gate_passed,
+        sort_by=sort_by,
+        sort_order=sort_order,
     )
 
     return build_evaluation_history(

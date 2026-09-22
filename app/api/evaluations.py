@@ -210,6 +210,8 @@ def get_evaluation_history(
     embedding_model: str | None = Query(default=None),
     status: str | None = Query(default=None),
     quality_gate_passed: bool | None = Query(default=None),
+    created_after: datetime | None = Query(default=None),
+    created_before: datetime | None = Query(default=None),
     sort_by: Literal[
         "created_at",
         "total_cases",
@@ -222,12 +224,24 @@ def get_evaluation_history(
 ):
     repository = EvaluationRepository(db)
 
+    if (
+        created_after is not None
+        and created_before is not None
+        and created_after > created_before
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="created_after must be earlier than or equal to created_before.",
+        )
+
     total = repository.count_runs(
         dataset_name=dataset_name,
         llm_model=llm_model,
         embedding_model=embedding_model,
         status=status,
         quality_gate_passed=quality_gate_passed,
+        created_after=created_after,
+        created_before=created_before,
     )
 
     runs = repository.list_runs(
@@ -238,6 +252,8 @@ def get_evaluation_history(
         embedding_model=embedding_model,
         status=status,
         quality_gate_passed=quality_gate_passed,
+        created_after=created_after,
+        created_before=created_before,
         sort_by=sort_by,
         sort_order=sort_order,
     )

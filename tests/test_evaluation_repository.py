@@ -1011,3 +1011,116 @@ def test_list_runs_rejects_unsupported_sort_order():
         repository.list_runs(
             sort_order="sideways",
         )
+
+
+def test_list_runs_with_created_after_filter():
+    db = Mock()
+
+    query = db.query.return_value
+    filtered_query = query.filter.return_value
+    ordered_query = filtered_query.order_by.return_value
+
+    runs = [Mock(id=5)]
+    ordered_query.all.return_value = runs
+
+    repository = EvaluationRepository(db)
+
+    created_after = datetime(
+        2026,
+        9,
+        1,
+        0,
+        0,
+        0,
+    )
+
+    result = repository.list_runs(
+        created_after=created_after,
+    )
+
+    assert result == runs
+    query.filter.assert_called_once()
+    ordered_query.all.assert_called_once()
+
+
+def test_list_runs_with_created_date_range():
+    db = Mock()
+
+    query = db.query.return_value
+    filtered_once = query.filter.return_value
+    filtered_twice = filtered_once.filter.return_value
+    ordered_query = filtered_twice.order_by.return_value
+
+    runs = [Mock(id=7)]
+    ordered_query.all.return_value = runs
+
+    repository = EvaluationRepository(db)
+
+    created_after = datetime(
+        2026,
+        9,
+        1,
+        0,
+        0,
+        0,
+    )
+
+    created_before = datetime(
+        2026,
+        9,
+        30,
+        23,
+        59,
+        59,
+    )
+
+    result = repository.list_runs(
+        created_after=created_after,
+        created_before=created_before,
+    )
+
+    assert result == runs
+
+    query.filter.assert_called_once()
+    filtered_once.filter.assert_called_once()
+    ordered_query.all.assert_called_once()
+
+
+def test_count_runs_with_created_date_range():
+    db = Mock()
+
+    query = db.query.return_value
+    filtered_query = query.filter.return_value
+
+    filtered_query.filter.return_value = filtered_query
+    filtered_query.count.return_value = 8
+
+    repository = EvaluationRepository(db)
+
+    created_after = datetime(
+        2026,
+        9,
+        1,
+        0,
+        0,
+        0,
+    )
+
+    created_before = datetime(
+        2026,
+        9,
+        30,
+        23,
+        59,
+        59,
+    )
+
+    result = repository.count_runs(
+        created_after=created_after,
+        created_before=created_before,
+    )
+
+    assert result == 8
+    query.filter.assert_called_once()
+    filtered_query.filter.assert_called()
+    filtered_query.count.assert_called_once()

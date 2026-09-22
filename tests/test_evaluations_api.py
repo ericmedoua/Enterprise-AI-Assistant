@@ -135,6 +135,8 @@ def test_get_evaluation_history(
         embedding_model="all-MiniLM-L6-v2",
         status="completed",
         quality_gate_passed=True,
+        created_after=None,
+        created_before=None,
         sort_by="average_groundedness",
         sort_order="asc",
     )
@@ -145,6 +147,8 @@ def test_get_evaluation_history(
         embedding_model="all-MiniLM-L6-v2",
         status="completed",
         quality_gate_passed=True,
+        created_after=None,
+        created_before=None,
     )
 
     assert response.status_code == 200
@@ -225,6 +229,8 @@ def test_get_evaluation_history_uses_default_sorting(
         embedding_model=None,
         status=None,
         quality_gate_passed=None,
+        created_after=None,
+        created_before=None,
         sort_by="created_at",
         sort_order="desc",
     )
@@ -1909,6 +1915,8 @@ def test_get_evaluation_history_with_quality_gate_filter(
         embedding_model=None,
         status=None,
         quality_gate_passed=False,
+        created_after=None,
+        created_before=None,
     )
 
     mock_repository.return_value.list_runs.assert_called_once_with(
@@ -1919,6 +1927,8 @@ def test_get_evaluation_history_with_quality_gate_filter(
         embedding_model=None,
         status=None,
         quality_gate_passed=False,
+        created_after=None,
+        created_before=None,
         sort_by="created_at",
         sort_order="desc",
     )
@@ -1941,6 +1951,8 @@ def test_get_evaluation_history_with_status_filter(
         embedding_model=None,
         status="failed",
         quality_gate_passed=None,
+        created_after=None,
+        created_before=None,
     )
 
 
@@ -1981,6 +1993,122 @@ def test_get_evaluation_history_accepts_supported_sort_fields(
         embedding_model=None,
         status=None,
         quality_gate_passed=None,
+        created_after=None,
+        created_before=None,
         sort_by=sort_by,
         sort_order="desc",
+    )
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_history_with_created_date_range(
+    mock_repository,
+):
+    mock_repository.return_value.count_runs.return_value = 4
+    mock_repository.return_value.list_runs.return_value = []
+
+    response = client.get(
+        "/api/v1/evaluations/history",
+        params={
+            "created_after": "2026-09-01T00:00:00",
+            "created_before": "2026-09-10T23:59:59",
+        },
+    )
+
+    assert response.status_code == 200
+
+    expected_after = datetime(
+        2026,
+        9,
+        1,
+        0,
+        0,
+        0,
+    )
+
+    expected_before = datetime(
+        2026,
+        9,
+        10,
+        23,
+        59,
+        59,
+    )
+
+    mock_repository.return_value.count_runs.assert_called_once_with(
+        dataset_name=None,
+        llm_model=None,
+        embedding_model=None,
+        status=None,
+        quality_gate_passed=None,
+        created_after=expected_after,
+        created_before=expected_before,
+    )
+
+    mock_repository.return_value.list_runs.assert_called_once_with(
+        limit=10,
+        offset=0,
+        dataset_name=None,
+        llm_model=None,
+        embedding_model=None,
+        status=None,
+        quality_gate_passed=None,
+        created_after=expected_after,
+        created_before=expected_before,
+        sort_by="created_at",
+        sort_order="desc",
+    )
+
+
+def test_get_evaluation_history_rejects_invalid_created_date_range():
+    response = client.get(
+        "/api/v1/evaluations/history",
+        params={
+            "created_after": "2026-09-10T00:00:00",
+            "created_before": "2026-09-01T00:00:00",
+        },
+    )
+
+    assert response.status_code == 422
+    data = response.json()
+
+    assert data["success"] is False
+    assert data["error"] == (
+        "created_after must be earlier than or equal to created_before."
+    )
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_history_with_created_after_only(
+    mock_repository,
+):
+    mock_repository.return_value.count_runs.return_value = 7
+    mock_repository.return_value.list_runs.return_value = []
+
+    response = client.get(
+        "/api/v1/evaluations/history",
+        params={
+            "created_after": "2026-09-01T00:00:00",
+        },
+    )
+
+    assert response.status_code == 200
+
+    expected_after = datetime(
+        2026,
+        9,
+        1,
+        0,
+        0,
+        0,
+    )
+
+    mock_repository.return_value.count_runs.assert_called_once_with(
+        dataset_name=None,
+        llm_model=None,
+        embedding_model=None,
+        status=None,
+        quality_gate_passed=None,
+        created_after=expected_after,
+        created_before=None,
     )

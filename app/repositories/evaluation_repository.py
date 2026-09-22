@@ -149,6 +149,8 @@ class EvaluationRepository:
         quality_gate_passed: bool | None = None,
         sort_by: str = "created_at",
         sort_order: str = "desc",
+        created_after: datetime | None = None,
+        created_before: datetime | None = None,
     ) -> list[EvaluationRun]:
         if sort_by not in EVALUATION_HISTORY_SORT_FIELDS:
             raise ValueError(f"Unsupported evaluation history sort field: {sort_by}")
@@ -162,6 +164,8 @@ class EvaluationRepository:
             embedding_model=embedding_model,
             status=status,
             quality_gate_passed=quality_gate_passed,
+            created_after=created_after,
+            created_before=created_before,
         )
 
         sort_column = EVALUATION_HISTORY_SORT_FIELDS[sort_by]
@@ -202,6 +206,8 @@ class EvaluationRepository:
         embedding_model: str | None = None,
         status: str | None = None,
         quality_gate_passed: bool | None = None,
+        created_after: datetime | None = None,
+        created_before: datetime | None = None,
     ):
         query = self.db.query(EvaluationRun)
 
@@ -230,6 +236,16 @@ class EvaluationRepository:
                 EvaluationRun.quality_gate_passed == quality_gate_passed,
             )
 
+        if created_after is not None:
+            query = query.filter(
+                EvaluationRun.created_at >= created_after,
+            )
+
+        if created_before is not None:
+            query = query.filter(
+                EvaluationRun.created_at <= created_before,
+            )
+
         return query
 
     def count_runs(
@@ -239,6 +255,8 @@ class EvaluationRepository:
         embedding_model: str | None = None,
         status: str | None = None,
         quality_gate_passed: bool | None = None,
+        created_after: datetime | None = None,
+        created_before: datetime | None = None,
     ) -> int:
         query = self._build_runs_query(
             dataset_name=dataset_name,
@@ -246,6 +264,8 @@ class EvaluationRepository:
             embedding_model=embedding_model,
             status=status,
             quality_gate_passed=quality_gate_passed,
+            created_after=created_after,
+            created_before=created_before,
         )
 
         return query.count()

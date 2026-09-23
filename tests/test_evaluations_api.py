@@ -2112,3 +2112,94 @@ def test_get_evaluation_history_with_created_after_only(
         created_after=expected_after,
         created_before=None,
     )
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        "queued",
+        "running",
+        "completed",
+        "failed",
+        "cancelled",
+    ],
+)
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_history_accepts_supported_statuses(
+    mock_repository,
+    status,
+):
+    mock_repository.return_value.count_runs.return_value = 0
+    mock_repository.return_value.list_runs.return_value = []
+
+    response = client.get(
+        "/api/v1/evaluations/history",
+        params={
+            "status": status,
+        },
+    )
+
+    assert response.status_code == 200
+
+    mock_repository.return_value.count_runs.assert_called_once_with(
+        dataset_name=None,
+        llm_model=None,
+        embedding_model=None,
+        status=status,
+        quality_gate_passed=None,
+        created_after=None,
+        created_before=None,
+    )
+
+    mock_repository.return_value.list_runs.assert_called_once_with(
+        limit=10,
+        offset=0,
+        dataset_name=None,
+        llm_model=None,
+        embedding_model=None,
+        status=status,
+        quality_gate_passed=None,
+        created_after=None,
+        created_before=None,
+        sort_by="created_at",
+        sort_order="desc",
+    )
+
+
+def test_get_evaluation_history_rejects_invalid_status():
+    response = client.get(
+        "/api/v1/evaluations/history",
+        params={
+            "status": "unknown",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+@patch("app.api.evaluations.EvaluationRepository")
+def test_get_evaluation_history_filters_failed_quality_gate_runs(
+    mock_repository,
+):
+    mock_repository.return_value.count_runs.return_value = 3
+    mock_repository.return_value.list_runs.return_value = []
+
+    response = client.get(
+        "/api/v1/evaluations/history",
+        params={
+            "status": "completed",
+            "quality_gate_passed": "false",
+        },
+    )
+
+    assert response.status_code == 200
+
+    mock_repository.return_value.count_runs.assert_called_once_with(
+        dataset_name=None,
+        llm_model=None,
+        embedding_model=None,
+        status="completed",
+        quality_gate_passed=False,
+        created_after=None,
+        created_before=None,
+    )

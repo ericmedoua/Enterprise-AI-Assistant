@@ -208,7 +208,14 @@ def get_evaluation_history(
     dataset_name: str | None = Query(default=None),
     llm_model: str | None = Query(default=None),
     embedding_model: str | None = Query(default=None),
-    status: str | None = Query(default=None),
+    status: Literal[
+        "queued",
+        "running",
+        "completed",
+        "failed",
+        "cancelled",
+    ]
+    | None = Query(default=None),
     quality_gate_passed: bool | None = Query(default=None),
     created_after: datetime | None = Query(default=None),
     created_before: datetime | None = Query(default=None),

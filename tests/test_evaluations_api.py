@@ -10,6 +10,10 @@ from app.models.evaluation_run import EvaluationRun
 
 from datetime import datetime, timedelta, timezone
 
+from app.repositories.evaluation_history_filters import (
+    EvaluationHistoryFilters,
+)
+
 
 client = TestClient(app)
 
@@ -111,55 +115,51 @@ def test_get_evaluation_history(
     ]
 
     mock_repository.return_value.list_runs.return_value = runs
-
     mock_repository.return_value.count_runs.return_value = 5
 
     response = client.get(
-        "/api/v1/evaluations/history"
-        "?limit=2"
-        "&offset=2"
-        "&dataset_name=rag-evaluation-v1"
-        "&llm_model=openai/gpt-oss-120b"
-        "&embedding_model=all-MiniLM-L6-v2"
-        "&status=completed"
-        "&quality_gate_passed=true"
-        "&sort_by=average_groundedness"
-        "&sort_order=asc"
+        "/api/v1/evaluations/history",
+        params={
+            "limit": 2,
+            "offset": 2,
+            "dataset_name": "rag-evaluation-v1",
+            "llm_model": "openai/gpt-oss-120b",
+            "embedding_model": "all-MiniLM-L6-v2",
+            "status": "completed",
+            "quality_gate_passed": "true",
+            "sort_by": "average_groundedness",
+            "sort_order": "asc",
+        },
+    )
+
+    expected_filters = EvaluationHistoryFilters(
+        dataset_name="rag-evaluation-v1",
+        llm_model="openai/gpt-oss-120b",
+        embedding_model="all-MiniLM-L6-v2",
+        status="completed",
+        quality_gate_passed=True,
+    )
+
+    mock_repository.return_value.count_runs.assert_called_once_with(
+        filters=expected_filters,
     )
 
     mock_repository.return_value.list_runs.assert_called_once_with(
         limit=2,
         offset=2,
-        dataset_name="rag-evaluation-v1",
-        llm_model="openai/gpt-oss-120b",
-        embedding_model="all-MiniLM-L6-v2",
-        status="completed",
-        quality_gate_passed=True,
-        created_after=None,
-        created_before=None,
+        filters=expected_filters,
         sort_by="average_groundedness",
         sort_order="asc",
-    )
-
-    mock_repository.return_value.count_runs.assert_called_once_with(
-        dataset_name="rag-evaluation-v1",
-        llm_model="openai/gpt-oss-120b",
-        embedding_model="all-MiniLM-L6-v2",
-        status="completed",
-        quality_gate_passed=True,
-        created_after=None,
-        created_before=None,
     )
 
     assert response.status_code == 200
 
     data = response.json()
 
-    assert "runs" in data
     assert len(data["runs"]) == 2
 
     assert data["runs"][0]["id"] == 2
-    assert data["runs"][0]["dataset_name"] == ("rag-evaluation-v2")
+    assert data["runs"][0]["dataset_name"] == "rag-evaluation-v2"
     assert data["runs"][0]["status"] == "completed"
 
     assert data["runs"][1]["id"] == 1
@@ -170,14 +170,6 @@ def test_get_evaluation_history(
     assert data["pagination"]["total"] == 5
     assert data["pagination"]["has_next"] is True
     assert data["pagination"]["has_previous"] is True
-
-    assert data["pagination"]["limit"] == 2
-    assert data["pagination"]["offset"] == 2
-    assert data["pagination"]["total"] == 5
-    assert data["pagination"]["has_next"] is True
-    assert data["pagination"]["has_previous"] is True
-
-    mock_repository.return_value.count_runs.assert_called_once()
 
 
 def test_get_evaluation_history_rejects_invalid_sort_by():
@@ -221,16 +213,16 @@ def test_get_evaluation_history_uses_default_sorting(
 
     assert response.status_code == 200
 
+    expected_filters = EvaluationHistoryFilters()
+
+    mock_repository.return_value.count_runs.assert_called_once_with(
+        filters=expected_filters,
+    )
+
     mock_repository.return_value.list_runs.assert_called_once_with(
         limit=10,
         offset=0,
-        dataset_name=None,
-        llm_model=None,
-        embedding_model=None,
-        status=None,
-        quality_gate_passed=None,
-        created_after=None,
-        created_before=None,
+        filters=expected_filters,
         sort_by="created_at",
         sort_order="desc",
     )
@@ -569,6 +561,8 @@ def test_get_evaluation_run_status(
 
     assert data["id"] == 25
     assert data["status"] == "failed"
+
+    mock_repository.return_value.get_run.assert_called_once_with(25)
 
 
 @patch("app.api.evaluations.app_logger")
@@ -1430,6 +1424,11 @@ def test_get_evaluation_quality_health_quality_gate_failed(
 
     response = client.get("/api/v1/evaluations/quality-health")
 
+    expected_filters = EvaluationHistoryFilters(
+        status="completed",
+        quality_gate_passed=True,
+    )
+
     assert response.status_code == 200
 
     data = response.json()
@@ -1789,6 +1788,11 @@ def test_get_evaluation_dashboard_with_quality_gate_and_regression_insights():
     ):
         response = client.get("/api/v1/evaluations/dashboard")
 
+    expected_filters = EvaluationHistoryFilters(
+        status="completed",
+        quality_gate_passed=True,
+    )
+
     assert response.status_code == 200
 
     data = response.json()
@@ -1909,26 +1913,18 @@ def test_get_evaluation_history_with_quality_gate_filter(
 
     assert response.status_code == 200
 
-    mock_repository.return_value.count_runs.assert_called_once_with(
-        dataset_name=None,
-        llm_model=None,
-        embedding_model=None,
-        status=None,
+    expected_filters = EvaluationHistoryFilters(
         quality_gate_passed=False,
-        created_after=None,
-        created_before=None,
+    )
+
+    mock_repository.return_value.count_runs.assert_called_once_with(
+        filters=expected_filters,
     )
 
     mock_repository.return_value.list_runs.assert_called_once_with(
         limit=10,
         offset=0,
-        dataset_name=None,
-        llm_model=None,
-        embedding_model=None,
-        status=None,
-        quality_gate_passed=False,
-        created_after=None,
-        created_before=None,
+        filters=expected_filters,
         sort_by="created_at",
         sort_order="desc",
     )
@@ -1945,14 +1941,20 @@ def test_get_evaluation_history_with_status_filter(
 
     assert response.status_code == 200
 
-    mock_repository.return_value.count_runs.assert_called_once_with(
-        dataset_name=None,
-        llm_model=None,
-        embedding_model=None,
+    expected_filters = EvaluationHistoryFilters(
         status="failed",
-        quality_gate_passed=None,
-        created_after=None,
-        created_before=None,
+    )
+
+    mock_repository.return_value.count_runs.assert_called_once_with(
+        filters=expected_filters,
+    )
+
+    mock_repository.return_value.list_runs.assert_called_once_with(
+        limit=10,
+        offset=0,
+        filters=expected_filters,
+        sort_by="created_at",
+        sort_order="desc",
     )
 
 
@@ -1983,21 +1985,21 @@ def test_get_evaluation_history_accepts_supported_sort_fields(
         },
     )
 
-    assert response.status_code == 200
+    expected_filters = EvaluationHistoryFilters()
+
+    mock_repository.return_value.count_runs.assert_called_once_with(
+        filters=expected_filters,
+    )
 
     mock_repository.return_value.list_runs.assert_called_once_with(
         limit=10,
         offset=0,
-        dataset_name=None,
-        llm_model=None,
-        embedding_model=None,
-        status=None,
-        quality_gate_passed=None,
-        created_after=None,
-        created_before=None,
+        filters=expected_filters,
         sort_by=sort_by,
         sort_order="desc",
     )
+
+    assert response.status_code == 200
 
 
 @patch("app.api.evaluations.EvaluationRepository")
@@ -2014,8 +2016,6 @@ def test_get_evaluation_history_with_created_date_range(
             "created_before": "2026-09-10T23:59:59",
         },
     )
-
-    assert response.status_code == 200
 
     expected_after = datetime(
         2026,
@@ -2035,29 +2035,24 @@ def test_get_evaluation_history_with_created_date_range(
         59,
     )
 
-    mock_repository.return_value.count_runs.assert_called_once_with(
-        dataset_name=None,
-        llm_model=None,
-        embedding_model=None,
-        status=None,
-        quality_gate_passed=None,
+    expected_filters = EvaluationHistoryFilters(
         created_after=expected_after,
         created_before=expected_before,
+    )
+
+    mock_repository.return_value.count_runs.assert_called_once_with(
+        filters=expected_filters,
     )
 
     mock_repository.return_value.list_runs.assert_called_once_with(
         limit=10,
         offset=0,
-        dataset_name=None,
-        llm_model=None,
-        embedding_model=None,
-        status=None,
-        quality_gate_passed=None,
-        created_after=expected_after,
-        created_before=expected_before,
+        filters=expected_filters,
         sort_by="created_at",
         sort_order="desc",
     )
+
+    assert response.status_code == 200
 
 
 def test_get_evaluation_history_rejects_invalid_created_date_range():
@@ -2092,8 +2087,6 @@ def test_get_evaluation_history_with_created_after_only(
         },
     )
 
-    assert response.status_code == 200
-
     expected_after = datetime(
         2026,
         9,
@@ -2103,15 +2096,23 @@ def test_get_evaluation_history_with_created_after_only(
         0,
     )
 
-    mock_repository.return_value.count_runs.assert_called_once_with(
-        dataset_name=None,
-        llm_model=None,
-        embedding_model=None,
-        status=None,
-        quality_gate_passed=None,
+    expected_filters = EvaluationHistoryFilters(
         created_after=expected_after,
-        created_before=None,
     )
+
+    mock_repository.return_value.count_runs.assert_called_once_with(
+        filters=expected_filters,
+    )
+
+    mock_repository.return_value.list_runs.assert_called_once_with(
+        limit=10,
+        offset=0,
+        filters=expected_filters,
+        sort_by="created_at",
+        sort_order="desc",
+    )
+
+    assert response.status_code == 200
 
 
 @pytest.mark.parametrize(
@@ -2139,31 +2140,23 @@ def test_get_evaluation_history_accepts_supported_statuses(
         },
     )
 
-    assert response.status_code == 200
+    expected_filters = EvaluationHistoryFilters(
+        status=status,
+    )
 
     mock_repository.return_value.count_runs.assert_called_once_with(
-        dataset_name=None,
-        llm_model=None,
-        embedding_model=None,
-        status=status,
-        quality_gate_passed=None,
-        created_after=None,
-        created_before=None,
+        filters=expected_filters,
     )
 
     mock_repository.return_value.list_runs.assert_called_once_with(
         limit=10,
         offset=0,
-        dataset_name=None,
-        llm_model=None,
-        embedding_model=None,
-        status=status,
-        quality_gate_passed=None,
-        created_after=None,
-        created_before=None,
+        filters=expected_filters,
         sort_by="created_at",
         sort_order="desc",
     )
+
+    assert response.status_code == 200
 
 
 def test_get_evaluation_history_rejects_invalid_status():
@@ -2178,7 +2171,7 @@ def test_get_evaluation_history_rejects_invalid_status():
 
 
 @patch("app.api.evaluations.EvaluationRepository")
-def test_get_evaluation_history_filters_failed_quality_gate_runs(
+def test_get_evaluation_history_filters_completed_quality_gate_failed_runs(
     mock_repository,
 ):
     mock_repository.return_value.count_runs.return_value = 3
@@ -2187,19 +2180,26 @@ def test_get_evaluation_history_filters_failed_quality_gate_runs(
     response = client.get(
         "/api/v1/evaluations/history",
         params={
-            "status": "completed",
-            "quality_gate_passed": "false",
+            "status": "failed",
+            "quality_gate_passed": False,
         },
     )
 
-    assert response.status_code == 200
+    expected_filters = EvaluationHistoryFilters(
+        status="failed",
+        quality_gate_passed=False,
+    )
 
     mock_repository.return_value.count_runs.assert_called_once_with(
-        dataset_name=None,
-        llm_model=None,
-        embedding_model=None,
-        status="completed",
-        quality_gate_passed=False,
-        created_after=None,
-        created_before=None,
+        filters=expected_filters,
     )
+
+    mock_repository.return_value.list_runs.assert_called_once_with(
+        limit=10,
+        offset=0,
+        filters=expected_filters,
+        sort_by="created_at",
+        sort_order="desc",
+    )
+
+    assert response.status_code == 200

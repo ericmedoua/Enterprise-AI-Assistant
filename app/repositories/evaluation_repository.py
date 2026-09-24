@@ -15,6 +15,10 @@ from app.ai.evaluation.quality_gate import (
 )
 from datetime import datetime, timezone
 
+from app.repositories.evaluation_history_filters import (
+    EvaluationHistoryFilters,
+)
+
 from app.core.constants import (
     EVALUATION_STATUS_CANCELLED,
     EVALUATION_STATUS_COMPLETED,
@@ -142,15 +146,9 @@ class EvaluationRepository:
         self,
         limit: int | None = None,
         offset: int = 0,
-        dataset_name: str | None = None,
-        llm_model: str | None = None,
-        embedding_model: str | None = None,
-        status: str | None = None,
-        quality_gate_passed: bool | None = None,
+        filters: EvaluationHistoryFilters | None = None,
         sort_by: str = "created_at",
         sort_order: str = "desc",
-        created_after: datetime | None = None,
-        created_before: datetime | None = None,
     ) -> list[EvaluationRun]:
         if sort_by not in EVALUATION_HISTORY_SORT_FIELDS:
             raise ValueError(f"Unsupported evaluation history sort field: {sort_by}")
@@ -158,15 +156,7 @@ class EvaluationRepository:
         if sort_order not in {"asc", "desc"}:
             raise ValueError(f"Unsupported evaluation history sort order: {sort_order}")
 
-        query = self._build_runs_query(
-            dataset_name=dataset_name,
-            llm_model=llm_model,
-            embedding_model=embedding_model,
-            status=status,
-            quality_gate_passed=quality_gate_passed,
-            created_after=created_after,
-            created_before=created_before,
-        )
+        query = self._build_runs_query(filters)
 
         sort_column = EVALUATION_HISTORY_SORT_FIELDS[sort_by]
 
@@ -201,74 +191,55 @@ class EvaluationRepository:
 
     def _build_runs_query(
         self,
-        dataset_name: str | None = None,
-        llm_model: str | None = None,
-        embedding_model: str | None = None,
-        status: str | None = None,
-        quality_gate_passed: bool | None = None,
-        created_after: datetime | None = None,
-        created_before: datetime | None = None,
+        filters: EvaluationHistoryFilters | None = None,
     ):
         query = self.db.query(EvaluationRun)
 
-        if dataset_name is not None:
+        if filters is None:
+            return query
+
+        if filters.dataset_name is not None:
             query = query.filter(
-                EvaluationRun.dataset_name == dataset_name,
+                EvaluationRun.dataset_name == filters.dataset_name,
             )
 
-        if llm_model is not None:
+        if filters.llm_model is not None:
             query = query.filter(
-                EvaluationRun.llm_model == llm_model,
+                EvaluationRun.llm_model == filters.llm_model,
             )
 
-        if embedding_model is not None:
+        if filters.embedding_model is not None:
             query = query.filter(
-                EvaluationRun.embedding_model == embedding_model,
+                EvaluationRun.embedding_model == filters.embedding_model,
             )
 
-        if status is not None:
+        if filters.status is not None:
             query = query.filter(
-                EvaluationRun.status == status,
+                EvaluationRun.status == filters.status,
             )
 
-        if quality_gate_passed is not None:
+        if filters.quality_gate_passed is not None:
             query = query.filter(
-                EvaluationRun.quality_gate_passed == quality_gate_passed,
+                EvaluationRun.quality_gate_passed == filters.quality_gate_passed,
             )
 
-        if created_after is not None:
+        if filters.created_after is not None:
             query = query.filter(
-                EvaluationRun.created_at >= created_after,
+                EvaluationRun.created_at >= filters.created_after,
             )
 
-        if created_before is not None:
+        if filters.created_before is not None:
             query = query.filter(
-                EvaluationRun.created_at <= created_before,
+                EvaluationRun.created_at <= filters.created_before,
             )
 
         return query
 
     def count_runs(
         self,
-        dataset_name: str | None = None,
-        llm_model: str | None = None,
-        embedding_model: str | None = None,
-        status: str | None = None,
-        quality_gate_passed: bool | None = None,
-        created_after: datetime | None = None,
-        created_before: datetime | None = None,
+        filters: EvaluationHistoryFilters | None = None,
     ) -> int:
-        query = self._build_runs_query(
-            dataset_name=dataset_name,
-            llm_model=llm_model,
-            embedding_model=embedding_model,
-            status=status,
-            quality_gate_passed=quality_gate_passed,
-            created_after=created_after,
-            created_before=created_before,
-        )
-
-        return query.count()
+        return self._build_runs_query(filters).count()
 
     def create_run_from_report(
         self,

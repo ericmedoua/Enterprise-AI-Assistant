@@ -118,6 +118,9 @@ from app.ai.evaluation.evaluation_dashboard_history_service import (
 from app.ai.evaluation.evaluation_deployment_readiness_service import (
     build_evaluation_deployment_readiness,
 )
+from app.repositories.evaluation_history_filters import (
+    EvaluationHistoryFilters,
+)
 
 
 router = APIRouter(
@@ -241,7 +244,7 @@ def get_evaluation_history(
             detail="created_after must be earlier than or equal to created_before.",
         )
 
-    total = repository.count_runs(
+    history_filters = EvaluationHistoryFilters(
         dataset_name=dataset_name,
         llm_model=llm_model,
         embedding_model=embedding_model,
@@ -251,16 +254,14 @@ def get_evaluation_history(
         created_before=created_before,
     )
 
+    total = repository.count_runs(
+        filters=history_filters,
+    )
+
     runs = repository.list_runs(
         limit=limit,
         offset=offset,
-        dataset_name=dataset_name,
-        llm_model=llm_model,
-        embedding_model=embedding_model,
-        status=status,
-        quality_gate_passed=quality_gate_passed,
-        created_after=created_after,
-        created_before=created_before,
+        filters=history_filters,
         sort_by=sort_by,
         sort_order=sort_order,
     )

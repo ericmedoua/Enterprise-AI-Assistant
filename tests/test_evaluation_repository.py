@@ -24,6 +24,9 @@ from datetime import (
     timedelta,
     timezone,
 )
+from app.repositories.evaluation_history_filters import (
+    EvaluationHistoryFilters,
+)
 
 
 def test_create_run():
@@ -524,6 +527,35 @@ def test_list_runs_with_limit():
     limited_query.all.assert_called_once()
 
 
+def test_list_runs_with_date_filters():
+    db = Mock()
+
+    query = db.query.return_value
+    filtered_once = query.filter.return_value
+    filtered_twice = filtered_once.filter.return_value
+    ordered_query = filtered_twice.order_by.return_value
+
+    runs = [Mock(id=8)]
+    ordered_query.all.return_value = runs
+
+    repository = EvaluationRepository(db)
+
+    filters = EvaluationHistoryFilters(
+        created_after=datetime(2026, 9, 1),
+        created_before=datetime(2026, 9, 10, 23, 59, 59),
+    )
+
+    result = repository.list_runs(
+        filters=filters,
+    )
+
+    assert result == runs
+
+    query.filter.assert_called_once()
+    filtered_once.filter.assert_called_once()
+    ordered_query.all.assert_called_once()
+
+
 def test_list_runs_with_limit_and_offset():
     db = Mock()
 
@@ -879,8 +911,12 @@ def test_list_runs_with_dataset_filter():
 
     repository = EvaluationRepository(db)
 
-    result = repository.list_runs(
+    filters = EvaluationHistoryFilters(
         dataset_name="rag-evaluation-v1",
+    )
+
+    result = repository.list_runs(
+        filters=filters,
     )
 
     assert result == runs
@@ -903,10 +939,14 @@ def test_list_runs_with_multiple_filters():
 
     repository = EvaluationRepository(db)
 
-    result = repository.list_runs(
+    filters = EvaluationHistoryFilters(
         dataset_name="rag-evaluation-v1",
         status="completed",
         quality_gate_passed=True,
+    )
+
+    result = repository.list_runs(
+        filters=filters,
     )
 
     assert result == runs
@@ -928,10 +968,14 @@ def test_count_runs_with_filters():
 
     repository = EvaluationRepository(db)
 
-    result = repository.count_runs(
+    filters = EvaluationHistoryFilters(
         dataset_name="rag-evaluation-v1",
         status="completed",
         quality_gate_passed=True,
+    )
+
+    result = repository.count_runs(
+        filters=filters,
     )
 
     assert result == 12
@@ -1034,8 +1078,12 @@ def test_list_runs_with_created_after_filter():
         0,
     )
 
-    result = repository.list_runs(
+    filters = EvaluationHistoryFilters(
         created_after=created_after,
+    )
+
+    result = repository.list_runs(
+        filters=filters,
     )
 
     assert result == runs
@@ -1074,9 +1122,13 @@ def test_list_runs_with_created_date_range():
         59,
     )
 
-    result = repository.list_runs(
+    filters = EvaluationHistoryFilters(
         created_after=created_after,
         created_before=created_before,
+    )
+
+    result = repository.list_runs(
+        filters=filters,
     )
 
     assert result == runs
@@ -1115,9 +1167,13 @@ def test_count_runs_with_created_date_range():
         59,
     )
 
-    result = repository.count_runs(
+    filters = EvaluationHistoryFilters(
         created_after=created_after,
         created_before=created_before,
+    )
+
+    result = repository.count_runs(
+        filters=filters,
     )
 
     assert result == 8

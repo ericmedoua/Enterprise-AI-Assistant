@@ -10,6 +10,20 @@ EvaluationStatus = Literal[
     "cancelled",
 ]
 
+EvaluationHistorySortField = Literal[
+    "created_at",
+    "total_cases",
+    "retrieval_hit_rate",
+    "average_groundedness",
+    "average_semantic_relevance",
+    "overall_pass_rate",
+]
+
+EvaluationHistorySortOrder = Literal[
+    "asc",
+    "desc",
+]
+
 
 @dataclass(frozen=True)
 class EvaluationHistoryFilters:

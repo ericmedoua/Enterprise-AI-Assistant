@@ -17,6 +17,9 @@ from datetime import datetime, timezone
 
 from app.repositories.evaluation_history_filters import (
     EvaluationHistoryFilters,
+    EvaluationHistorySortField,
+    EvaluationHistorySortOrder,
+    EvaluationStatus,
 )
 
 from app.core.constants import (
@@ -147,8 +150,8 @@ class EvaluationRepository:
         limit: int | None = None,
         offset: int = 0,
         filters: EvaluationHistoryFilters | None = None,
-        sort_by: str = "created_at",
-        sort_order: str = "desc",
+        sort_by: EvaluationHistorySortField = "created_at",
+        sort_order: EvaluationHistorySortOrder = "desc",
     ) -> list[EvaluationRun]:
         if sort_by not in EVALUATION_HISTORY_SORT_FIELDS:
             raise ValueError(f"Unsupported evaluation history sort field: {sort_by}")

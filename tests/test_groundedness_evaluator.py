@@ -187,3 +187,22 @@ def test_markdown_sources_heading_is_ignored_for_giraffe():
     assert result.score == 1.0
     assert result.supported_sentences == 1
     assert result.total_sentences == 1
+
+
+def test_groundedness_ignores_source_parenthetical_section():
+    answer = """- Rabbits love to munch on carrots.
+
+Source(s):
+- This Book Belongs To.pdf (Page 3)
+"""
+
+    context = "Rabbits hop quickly and love to munch on carrots."
+
+    result = evaluate_groundedness(
+        answer,
+        context,
+    )
+
+    assert result.score == 1.0
+    assert result.supported_sentences == 1
+    assert result.total_sentences == 1

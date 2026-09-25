@@ -68,7 +68,7 @@ def _extract_answer_sentences(answer: str) -> list[str]:
     """
 
     answer = re.split(
-        r"\bsources?\s*:",
+        r"\bsource(?:s|\(s\))?\s*:",
         answer,
         maxsplit=1,
         flags=re.IGNORECASE,

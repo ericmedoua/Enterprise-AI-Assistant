@@ -1,4 +1,4 @@
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -1016,6 +1016,46 @@ def test_count_runs_with_filters():
     query.filter.assert_called_once()
     filtered_query.filter.assert_called()
     filtered_query.count.assert_called_once()
+
+
+def test_count_runs_uses_only_query_filters():
+    db = Mock()
+
+    counted_query = Mock()
+    counted_query.count.return_value = 17
+
+    repository = EvaluationRepository(db)
+
+    filters = EvaluationHistoryFilters(
+        dataset_name="rag-evaluation-v1",
+        status="completed",
+        quality_gate_passed=True,
+    )
+
+    history_query = EvaluationHistoryQuery(
+        filters=filters,
+        limit=2,
+        offset=10,
+        sort_by="average_groundedness",
+        sort_order="asc",
+    )
+
+    with patch.object(
+        repository,
+        "_build_runs_query",
+        return_value=counted_query,
+    ) as mock_build_query:
+        result = repository.count_runs(
+            query=history_query,
+        )
+
+    assert result == 17
+
+    mock_build_query.assert_called_once_with(
+        filters,
+    )
+
+    counted_query.count.assert_called_once()
 
 
 def test_list_runs_sorts_by_groundedness_ascending():

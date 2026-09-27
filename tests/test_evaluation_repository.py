@@ -1120,6 +1120,68 @@ def test_list_runs_sorts_by_overall_pass_rate_descending():
     assert str(order_by_args[2]) == str(EvaluationRun.id.desc())
 
 
+def test_list_runs_sorts_by_created_at_descending():
+    db = Mock()
+
+    query = db.query.return_value
+    ordered_query = query.order_by.return_value
+
+    runs = [Mock(id=2), Mock(id=1)]
+    ordered_query.all.return_value = runs
+
+    repository = EvaluationRepository(db)
+
+    result = repository.list_runs(
+        query=EvaluationHistoryQuery(
+            sort_by="created_at",
+            sort_order="desc",
+        ),
+    )
+
+    assert result == runs
+
+    query.order_by.assert_called_once()
+
+    order_by_args = query.order_by.call_args.args
+
+    assert len(order_by_args) == 2
+    assert str(order_by_args[0]) == str(EvaluationRun.created_at.desc())
+    assert str(order_by_args[1]) == str(EvaluationRun.id.desc())
+
+    ordered_query.all.assert_called_once()
+
+
+def test_list_runs_sorts_by_created_at_ascending():
+    db = Mock()
+
+    query = db.query.return_value
+    ordered_query = query.order_by.return_value
+
+    runs = [Mock(id=1), Mock(id=2)]
+    ordered_query.all.return_value = runs
+
+    repository = EvaluationRepository(db)
+
+    result = repository.list_runs(
+        query=EvaluationHistoryQuery(
+            sort_by="created_at",
+            sort_order="asc",
+        ),
+    )
+
+    assert result == runs
+
+    query.order_by.assert_called_once()
+
+    order_by_args = query.order_by.call_args.args
+
+    assert len(order_by_args) == 2
+    assert str(order_by_args[0]) == str(EvaluationRun.created_at.asc())
+    assert str(order_by_args[1]) == str(EvaluationRun.id.desc())
+
+    ordered_query.all.assert_called_once()
+
+
 def test_list_runs_rejects_unsupported_sort_order():
     db = Mock()
 

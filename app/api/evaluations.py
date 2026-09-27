@@ -120,6 +120,7 @@ from app.ai.evaluation.evaluation_deployment_readiness_service import (
 )
 from app.repositories.evaluation_history_filters import (
     EvaluationHistoryFilters,
+    EvaluationHistoryQuery,
     EvaluationHistorySortField,
     EvaluationHistorySortOrder,
     EvaluationStatus,
@@ -215,7 +216,7 @@ def get_evaluation_history(
     llm_model: str | None = Query(default=None),
     embedding_model: str | None = Query(default=None),
     status: EvaluationStatus | None = Query(
-    default=None,
+        default=None,
     ),
     quality_gate_passed: bool | None = Query(default=None),
     created_after: datetime | None = Query(default=None),
@@ -249,16 +250,20 @@ def get_evaluation_history(
         created_before=created_before,
     )
 
+    history_query = EvaluationHistoryQuery(
+        filters=history_filters,
+        limit=limit,
+        offset=offset,
+        sort_by=sort_by,
+        sort_order=sort_order,
+    )
+
     total = repository.count_runs(
         filters=history_filters,
     )
 
     runs = repository.list_runs(
-        limit=limit,
-        offset=offset,
-        filters=history_filters,
-        sort_by=sort_by,
-        sort_order=sort_order,
+        query=history_query,
     )
 
     return build_evaluation_history(

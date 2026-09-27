@@ -26,6 +26,7 @@ from datetime import (
 )
 from app.repositories.evaluation_history_filters import (
     EvaluationHistoryFilters,
+    EvaluationHistoryQuery,
 )
 
 
@@ -508,7 +509,11 @@ def test_list_runs_with_limit():
 
     repository = EvaluationRepository(db)
 
-    result = repository.list_runs(limit=2)
+    result = repository.list_runs(
+        query=EvaluationHistoryQuery(
+            limit=2,
+        ),
+    )
 
     assert result == runs
 
@@ -546,7 +551,12 @@ def test_list_runs_with_date_filters():
     )
 
     result = repository.list_runs(
-        filters=filters,
+        query=EvaluationHistoryQuery(
+            filters=EvaluationHistoryFilters(
+                created_after=filters.created_after,
+                created_before=filters.created_before,
+            ),
+        ),
     )
 
     assert result == runs
@@ -574,8 +584,10 @@ def test_list_runs_with_limit_and_offset():
     repository = EvaluationRepository(db)
 
     result = repository.list_runs(
-        limit=2,
-        offset=2,
+        query=EvaluationHistoryQuery(
+            limit=2,
+            offset=2,
+        ),
     )
 
     assert result == runs
@@ -597,7 +609,11 @@ def test_list_runs_with_zero_offset_does_not_call_offset():
 
     repository = EvaluationRepository(db)
 
-    result = repository.list_runs(offset=0)
+    result = repository.list_runs(
+        query=EvaluationHistoryQuery(
+            offset=0,
+        ),
+    )
 
     assert result == runs
     ordered_query.offset.assert_not_called()
@@ -649,7 +665,11 @@ def test_list_runs_with_zero_limit():
 
     repository = EvaluationRepository(db)
 
-    result = repository.list_runs(limit=0)
+    result = repository.list_runs(
+        query=EvaluationHistoryQuery(
+            limit=0,
+        ),
+    )
 
     assert result == []
 
@@ -916,7 +936,11 @@ def test_list_runs_with_dataset_filter():
     )
 
     result = repository.list_runs(
-        filters=filters,
+        query=EvaluationHistoryQuery(
+            filters=EvaluationHistoryFilters(
+                dataset_name="rag-evaluation-v1",
+            ),
+        ),
     )
 
     assert result == runs
@@ -946,7 +970,13 @@ def test_list_runs_with_multiple_filters():
     )
 
     result = repository.list_runs(
-        filters=filters,
+        query=EvaluationHistoryQuery(
+            filters=EvaluationHistoryFilters(
+                dataset_name="rag-evaluation-v1",
+                status="completed",
+                quality_gate_passed=True,
+            ),
+        ),
     )
 
     assert result == runs
@@ -997,8 +1027,10 @@ def test_list_runs_sorts_by_groundedness_ascending():
     repository = EvaluationRepository(db)
 
     result = repository.list_runs(
-        sort_by="average_groundedness",
-        sort_order="asc",
+        query=EvaluationHistoryQuery(
+            sort_by="average_groundedness",
+            sort_order="asc",
+        ),
     )
 
     assert result == runs
@@ -1027,8 +1059,10 @@ def test_list_runs_sorts_by_overall_pass_rate_descending():
     repository = EvaluationRepository(db)
 
     result = repository.list_runs(
-        sort_by="overall_pass_rate",
-        sort_order="desc",
+        query=EvaluationHistoryQuery(
+            sort_by="overall_pass_rate",
+            sort_order="desc",
+        ),
     )
 
     assert result == runs
@@ -1053,7 +1087,9 @@ def test_list_runs_rejects_unsupported_sort_order():
         match="Unsupported evaluation history sort order",
     ):
         repository.list_runs(
-            sort_order="sideways",
+            query=EvaluationHistoryQuery(
+                sort_order="sideways",
+            ),
         )
 
 
@@ -1083,7 +1119,9 @@ def test_list_runs_with_created_after_filter():
     )
 
     result = repository.list_runs(
-        filters=filters,
+        query=EvaluationHistoryQuery(
+            filters=filters,
+        ),
     )
 
     assert result == runs
@@ -1128,7 +1166,9 @@ def test_list_runs_with_created_date_range():
     )
 
     result = repository.list_runs(
-        filters=filters,
+        query=EvaluationHistoryQuery(
+            filters=filters,
+        ),
     )
 
     assert result == runs

@@ -19,6 +19,7 @@ from app.repositories.evaluation_history_filters import (
     EvaluationHistoryFilters,
     EvaluationHistorySortField,
     EvaluationHistorySortOrder,
+    EvaluationHistoryQuery,
     EvaluationStatus,
 )
 
@@ -147,28 +148,33 @@ class EvaluationRepository:
 
     def list_runs(
         self,
-        limit: int | None = None,
-        offset: int = 0,
-        filters: EvaluationHistoryFilters | None = None,
-        sort_by: EvaluationHistorySortField = "created_at",
-        sort_order: EvaluationHistorySortOrder = "desc",
+        query: EvaluationHistoryQuery | None = None,
     ) -> list[EvaluationRun]:
-        if sort_by not in EVALUATION_HISTORY_SORT_FIELDS:
-            raise ValueError(f"Unsupported evaluation history sort field: {sort_by}")
+        if query is None:
+            query = EvaluationHistoryQuery()
 
-        if sort_order not in {"asc", "desc"}:
-            raise ValueError(f"Unsupported evaluation history sort order: {sort_order}")
+        if query.sort_by not in EVALUATION_HISTORY_SORT_FIELDS:
+            raise ValueError(
+                f"Unsupported evaluation history sort field: {query.sort_by}"
+            )
 
-        query = self._build_runs_query(filters)
+        if query.sort_order not in {"asc", "desc"}:
+            raise ValueError(
+                f"Unsupported evaluation history sort order: {query.sort_order}"
+            )
 
-        sort_column = EVALUATION_HISTORY_SORT_FIELDS[sort_by]
+        db_query = self._build_runs_query(
+            query.filters,
+        )
 
-        if sort_order == "asc":
+        sort_column = EVALUATION_HISTORY_SORT_FIELDS[query.sort_by]
+
+        if query.sort_order == "asc":
             primary_order = sort_column.asc()
         else:
             primary_order = sort_column.desc()
 
-        if sort_by == "created_at":
+        if query.sort_by == "created_at":
             order_by_clauses = [
                 primary_order,
                 EvaluationRun.id.desc(),
@@ -180,17 +186,21 @@ class EvaluationRepository:
                 EvaluationRun.id.desc(),
             ]
 
-        query = query.order_by(
+        db_query = db_query.order_by(
             *order_by_clauses,
         )
 
-        if offset:
-            query = query.offset(offset)
+        if query.offset:
+            db_query = db_query.offset(
+                query.offset,
+            )
 
-        if limit is not None:
-            query = query.limit(limit)
+        if query.limit is not None:
+            db_query = db_query.limit(
+                query.limit,
+            )
 
-        return query.all()
+        return db_query.all()
 
     def _build_runs_query(
         self,

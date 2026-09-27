@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 
 from app.repositories.evaluation_history_filters import (
     EvaluationHistoryFilters,
+    EvaluationHistoryQuery,
 )
 
 
@@ -144,18 +145,23 @@ def test_get_evaluation_history(
         filters=expected_filters,
     )
 
-    mock_repository.return_value.list_runs.assert_called_once_with(
+    expected_query = EvaluationHistoryQuery(
+        filters=expected_filters,
         limit=2,
         offset=2,
-        filters=expected_filters,
         sort_by="average_groundedness",
         sort_order="asc",
+    )
+
+    mock_repository.return_value.list_runs.assert_called_once_with(
+        query=expected_query,
     )
 
     assert response.status_code == 200
 
     data = response.json()
 
+    assert "runs" in data
     assert len(data["runs"]) == 2
 
     assert data["runs"][0]["id"] == 2
@@ -220,11 +226,13 @@ def test_get_evaluation_history_uses_default_sorting(
     )
 
     mock_repository.return_value.list_runs.assert_called_once_with(
-        limit=10,
-        offset=0,
-        filters=expected_filters,
-        sort_by="created_at",
-        sort_order="desc",
+        query=EvaluationHistoryQuery(
+            filters=expected_filters,
+            limit=10,
+            offset=0,
+            sort_by="created_at",
+            sort_order="desc",
+        ),
     )
 
 
@@ -1922,11 +1930,13 @@ def test_get_evaluation_history_with_quality_gate_filter(
     )
 
     mock_repository.return_value.list_runs.assert_called_once_with(
-        limit=10,
-        offset=0,
-        filters=expected_filters,
-        sort_by="created_at",
-        sort_order="desc",
+        query=EvaluationHistoryQuery(
+            filters=expected_filters,
+            limit=10,
+            offset=0,
+            sort_by="created_at",
+            sort_order="desc",
+        ),
     )
 
 
@@ -1950,11 +1960,13 @@ def test_get_evaluation_history_with_status_filter(
     )
 
     mock_repository.return_value.list_runs.assert_called_once_with(
-        limit=10,
-        offset=0,
-        filters=expected_filters,
-        sort_by="created_at",
-        sort_order="desc",
+        query=EvaluationHistoryQuery(
+            filters=expected_filters,
+            limit=10,
+            offset=0,
+            sort_by="created_at",
+            sort_order="desc",
+        ),
     )
 
 
@@ -1987,16 +1999,20 @@ def test_get_evaluation_history_accepts_supported_sort_fields(
 
     expected_filters = EvaluationHistoryFilters()
 
+    expected_query = EvaluationHistoryQuery(
+        filters=expected_filters,
+        limit=10,
+        offset=0,
+        sort_by=sort_by,
+        sort_order="desc",
+    )
+
     mock_repository.return_value.count_runs.assert_called_once_with(
         filters=expected_filters,
     )
 
     mock_repository.return_value.list_runs.assert_called_once_with(
-        limit=10,
-        offset=0,
-        filters=expected_filters,
-        sort_by=sort_by,
-        sort_order="desc",
+        query=expected_query,
     )
 
     assert response.status_code == 200
@@ -2045,11 +2061,13 @@ def test_get_evaluation_history_with_created_date_range(
     )
 
     mock_repository.return_value.list_runs.assert_called_once_with(
-        limit=10,
-        offset=0,
-        filters=expected_filters,
-        sort_by="created_at",
-        sort_order="desc",
+        query=EvaluationHistoryQuery(
+            filters=expected_filters,
+            limit=10,
+            offset=0,
+            sort_by="created_at",
+            sort_order="desc",
+        ),
     )
 
     assert response.status_code == 200
@@ -2105,11 +2123,13 @@ def test_get_evaluation_history_with_created_after_only(
     )
 
     mock_repository.return_value.list_runs.assert_called_once_with(
-        limit=10,
-        offset=0,
-        filters=expected_filters,
-        sort_by="created_at",
-        sort_order="desc",
+        query=EvaluationHistoryQuery(
+            filters=expected_filters,
+            limit=10,
+            offset=0,
+            sort_by="created_at",
+            sort_order="desc",
+        ),
     )
 
     assert response.status_code == 200
@@ -2149,11 +2169,13 @@ def test_get_evaluation_history_accepts_supported_statuses(
     )
 
     mock_repository.return_value.list_runs.assert_called_once_with(
-        limit=10,
-        offset=0,
-        filters=expected_filters,
-        sort_by="created_at",
-        sort_order="desc",
+        query=EvaluationHistoryQuery(
+            filters=expected_filters,
+            limit=10,
+            offset=0,
+            sort_by="created_at",
+            sort_order="desc",
+        ),
     )
 
     assert response.status_code == 200
@@ -2195,11 +2217,13 @@ def test_get_evaluation_history_filters_completed_quality_gate_failed_runs(
     )
 
     mock_repository.return_value.list_runs.assert_called_once_with(
-        limit=10,
-        offset=0,
-        filters=expected_filters,
-        sort_by="created_at",
-        sort_order="desc",
+        query=EvaluationHistoryQuery(
+            filters=expected_filters,
+            limit=10,
+            offset=0,
+            sort_by="created_at",
+            sort_order="desc",
+        ),
     )
 
     assert response.status_code == 200

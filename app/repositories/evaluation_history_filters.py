@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal
 
@@ -34,3 +34,14 @@ class EvaluationHistoryFilters:
     quality_gate_passed: bool | None = None
     created_after: datetime | None = None
     created_before: datetime | None = None
+
+
+@dataclass(frozen=True)
+class EvaluationHistoryQuery:
+    filters: EvaluationHistoryFilters = field(
+        default_factory=EvaluationHistoryFilters,
+    )
+    limit: int | None = None
+    offset: int = 0
+    sort_by: EvaluationHistorySortField = "created_at"
+    sort_order: EvaluationHistorySortOrder = "desc"

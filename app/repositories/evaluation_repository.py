@@ -17,10 +17,9 @@ from datetime import datetime, timezone
 
 from app.repositories.evaluation_history_filters import (
     EvaluationHistoryFilters,
+    EvaluationHistoryQuery,
     EvaluationHistorySortField,
     EvaluationHistorySortOrder,
-    EvaluationHistoryQuery,
-    EvaluationStatus,
 )
 
 from app.core.constants import (
@@ -250,9 +249,13 @@ class EvaluationRepository:
 
     def count_runs(
         self,
-        filters: EvaluationHistoryFilters | None = None,
+        query: EvaluationHistoryQuery | None = None,
     ) -> int:
-        return self._build_runs_query(filters).count()
+        filters = query.filters if query is not None else None
+
+        return self._build_runs_query(
+            filters,
+        ).count()
 
     def create_run_from_report(
         self,

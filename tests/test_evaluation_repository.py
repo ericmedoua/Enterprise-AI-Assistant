@@ -1004,10 +1004,13 @@ def test_count_runs_with_filters():
         quality_gate_passed=True,
     )
 
-    result = repository.count_runs(
+    history_query = EvaluationHistoryQuery(
         filters=filters,
     )
 
+    result = repository.count_runs(
+        query=history_query,
+    )
     assert result == 12
 
     query.filter.assert_called_once()
@@ -1212,8 +1215,12 @@ def test_count_runs_with_created_date_range():
         created_before=created_before,
     )
 
-    result = repository.count_runs(
+    history_query = EvaluationHistoryQuery(
         filters=filters,
+    )
+
+    result = repository.count_runs(
+        query=history_query,
     )
 
     assert result == 8

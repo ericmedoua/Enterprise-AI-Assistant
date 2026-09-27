@@ -6,7 +6,6 @@ from app.database.session import get_db
 from app.repositories.evaluation_repository import (
     EvaluationRepository,
 )
-from typing import Literal
 from app.schemas.evaluation import (
     EvaluationHistoryResponse,
     EvaluationObservabilityResponse,
@@ -259,7 +258,7 @@ def get_evaluation_history(
     )
 
     total = repository.count_runs(
-        filters=history_filters,
+        query=history_query,
     )
 
     runs = repository.list_runs(

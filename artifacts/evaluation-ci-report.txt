@@ -9,7 +9,7 @@ Evaluation Metrics
 ------------------
 Retrieval hit rate: 100.00%
 Groundedness: 100.00%
-Semantic relevance: 69.93%
+Semantic relevance: 70.00%
 Overall pass rate: 100.00%
 
 Reason: Evaluation passed and deployment is allowed.
@@ -18,7 +18,7 @@ EVALUATION COMPARISON
 =====================
 Retrieval delta:         +0.00%
 Groundedness delta:      +0.00%
-Semantic relevance:      +0.24%
+Semantic relevance:      +0.39%
 Source count delta:      +0.00
 Overall pass-rate delta: +0.00%
 

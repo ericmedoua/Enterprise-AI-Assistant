@@ -17,6 +17,10 @@ from app.schemas.evaluation import (
     EvaluationRunResponse,
 )
 
+from app.repositories.evaluation_history_filters import (
+    EvaluationHistoryQuery,
+)
+
 
 def compare_latest_runs(
     repository: EvaluationRepository,
@@ -40,6 +44,33 @@ def compare_latest_runs(
     return compare_evaluation_runs(
         previous=previous,
         current=current,
+    )
+
+
+def get_evaluation_history(
+    repository: EvaluationRepository,
+    query: EvaluationHistoryQuery,
+) -> EvaluationHistoryResponse:
+    """
+    Retrieve evaluation history using one shared history query.
+
+    The same query is used for both the total count and
+    paginated result retrieval.
+    """
+
+    total = repository.count_runs(
+        query=query,
+    )
+
+    runs = repository.list_runs(
+        query=query,
+    )
+
+    return build_evaluation_history(
+        runs,
+        limit=query.limit,
+        offset=query.offset,
+        total=total,
     )
 
 

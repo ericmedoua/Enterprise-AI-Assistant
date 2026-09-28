@@ -1,15 +1,13 @@
-import pytest
-
+from datetime import datetime, timedelta
 from unittest.mock import Mock
 
-from app.ai.evaluation.evaluation_history import (
-    compare_latest_runs,
-)
-
-from datetime import datetime, timedelta
+import pytest
 
 from app.ai.evaluation.evaluation_history import (
+    EvaluationHistoryQuery,
     build_evaluation_history,
+    compare_latest_runs,
+    get_evaluation_history,
 )
 from app.models.evaluation_run import EvaluationRun
 
@@ -186,3 +184,40 @@ def test_build_evaluation_history_with_pagination():
     assert result.pagination.total == 5
     assert result.pagination.has_next is True
     assert result.pagination.has_previous is True
+
+
+def test_get_evaluation_history_uses_same_query_for_count_and_list():
+    repository = Mock()
+
+    repository.count_runs.return_value = 3
+    repository.list_runs.return_value = []
+
+    query = EvaluationHistoryQuery(
+        limit=10,
+        offset=2,
+        sort_by="created_at",
+        sort_order="desc",
+    )
+
+    result = get_evaluation_history(
+        repository,
+        query,
+    )
+
+    assert result.pagination is not None
+    assert result.pagination.total == 3
+    assert result.pagination.limit == 10
+    assert result.pagination.offset == 2
+
+    repository.count_runs.assert_called_once_with(
+        query=query,
+    )
+
+    repository.list_runs.assert_called_once_with(
+        query=query,
+    )
+
+    count_query = repository.count_runs.call_args.kwargs["query"]
+    list_query = repository.list_runs.call_args.kwargs["query"]
+
+    assert count_query is list_query

@@ -94,6 +94,7 @@ from datetime import datetime, timezone
 
 from app.ai.evaluation.evaluation_history import (
     build_evaluation_history,
+    get_evaluation_history as fetch_evaluation_history,
 )
 
 from app.ai.evaluation.evaluation_trend_service import (
@@ -257,19 +258,9 @@ def get_evaluation_history(
         sort_order=sort_order,
     )
 
-    total = repository.count_runs(
-        query=history_query,
-    )
-
-    runs = repository.list_runs(
-        query=history_query,
-    )
-
-    return build_evaluation_history(
-        runs,
-        limit=limit,
-        offset=offset,
-        total=total,
+    return fetch_evaluation_history(
+        repository,
+        history_query,
     )
 
 

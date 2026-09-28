@@ -156,6 +156,11 @@ def test_get_evaluation_history(
     mock_repository.return_value.list_runs.assert_called_once_with(
         query=expected_query,
     )
+    count_query = mock_repository.return_value.count_runs.call_args.kwargs["query"]
+
+    list_query = mock_repository.return_value.list_runs.call_args.kwargs["query"]
+
+    assert count_query is list_query
 
     assert response.status_code == 200
 

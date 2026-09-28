@@ -597,6 +597,37 @@ def test_list_runs_with_limit_and_offset():
     limited_query.all.assert_called_once()
 
 
+def test_list_runs_with_offset_without_limit():
+    db = Mock()
+
+    query = db.query.return_value
+    ordered_query = query.order_by.return_value
+    offset_query = ordered_query.offset.return_value
+
+    runs = [
+        Mock(id=1),
+        Mock(id=0),
+    ]
+
+    offset_query.all.return_value = runs
+
+    repository = EvaluationRepository(db)
+
+    result = repository.list_runs(
+        query=EvaluationHistoryQuery(
+            offset=2,
+        ),
+    )
+
+    assert result == runs
+
+    query.order_by.assert_called_once()
+
+    ordered_query.offset.assert_called_once_with(2)
+    offset_query.limit.assert_not_called()
+    offset_query.all.assert_called_once()
+
+
 def test_list_runs_with_zero_offset_does_not_call_offset():
     db = Mock()
 

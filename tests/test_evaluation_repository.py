@@ -950,6 +950,30 @@ def test_count_runs():
     query.count.assert_called_once()
 
 
+def test_count_runs_without_query_counts_all_runs():
+    db = Mock()
+
+    counted_query = Mock()
+    counted_query.count.return_value = 23
+
+    repository = EvaluationRepository(db)
+
+    with patch.object(
+        repository,
+        "_build_runs_query",
+        return_value=counted_query,
+    ) as mock_build_query:
+        result = repository.count_runs()
+
+    assert result == 23
+
+    mock_build_query.assert_called_once_with(
+        None,
+    )
+
+    counted_query.count.assert_called_once()
+
+
 def test_list_runs_with_dataset_filter():
     db = Mock()
 

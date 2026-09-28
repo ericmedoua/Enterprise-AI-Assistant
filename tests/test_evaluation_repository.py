@@ -1253,6 +1253,23 @@ def test_list_runs_rejects_unsupported_sort_order():
         )
 
 
+def test_list_runs_rejects_unsupported_sort_by():
+    db = Mock()
+
+    repository = EvaluationRepository(db)
+
+    with pytest.raises(
+        ValueError,
+        match="Unsupported evaluation history sort field",
+    ):
+        repository.list_runs(
+            query=EvaluationHistoryQuery(
+                sort_by="invalid_metric",
+                sort_order="desc",
+            ),
+        )
+
+
 def test_list_runs_with_created_after_filter():
     db = Mock()
 

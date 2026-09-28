@@ -7,6 +7,10 @@ from app.database.session import SessionLocal
 from app.repositories.evaluation_repository import (
     EvaluationRepository,
 )
+from app.repositories.evaluation_history_filters import (
+    EvaluationHistoryFilters,
+    EvaluationHistoryQuery,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -250,6 +254,106 @@ def test_database_rejects_invalid_evaluation_status():
             db.flush()
 
         db.rollback()
+
+    finally:
+        db.close()
+
+
+def test_evaluation_history_query_filters_sorts_and_paginates():
+    db = SessionLocal()
+
+    try:
+        repository = EvaluationRepository(db)
+
+        first = repository.create_run(
+            dataset_name="history-query-test",
+            llm_model="openai/gpt-oss-120b",
+            embedding_model="all-MiniLM-L6-v2",
+            git_commit="test-commit",
+            total_cases=2,
+            retrieval_hit_rate=1.0,
+            average_groundedness=0.95,
+            average_semantic_relevance=0.90,
+            average_source_count=1.0,
+            overall_pass_rate=0.90,
+            quality_gate_passed=True,
+        )
+
+        second = repository.create_run(
+            dataset_name="history-query-test",
+            llm_model="openai/gpt-oss-120b",
+            embedding_model="all-MiniLM-L6-v2",
+            git_commit="test-commit",
+            total_cases=2,
+            retrieval_hit_rate=0.95,
+            average_groundedness=0.85,
+            average_semantic_relevance=0.80,
+            average_source_count=1.0,
+            overall_pass_rate=0.70,
+            quality_gate_passed=True,
+        )
+
+        excluded_quality_gate = repository.create_run(
+            dataset_name="history-query-test",
+            llm_model="openai/gpt-oss-120b",
+            embedding_model="all-MiniLM-L6-v2",
+            git_commit="test-commit",
+            total_cases=2,
+            retrieval_hit_rate=0.90,
+            average_groundedness=0.80,
+            average_semantic_relevance=0.75,
+            average_source_count=1.0,
+            overall_pass_rate=0.60,
+            quality_gate_passed=False,
+        )
+
+        excluded_dataset = repository.create_run(
+            dataset_name="different-dataset",
+            llm_model="openai/gpt-oss-120b",
+            embedding_model="all-MiniLM-L6-v2",
+            git_commit="test-commit",
+            total_cases=2,
+            retrieval_hit_rate=1.0,
+            average_groundedness=1.0,
+            average_semantic_relevance=1.0,
+            average_source_count=1.0,
+            overall_pass_rate=1.0,
+            quality_gate_passed=True,
+        )
+
+        history_filters = EvaluationHistoryFilters(
+            dataset_name="history-query-test",
+            quality_gate_passed=True,
+        )
+
+        history_query = EvaluationHistoryQuery(
+            filters=history_filters,
+            limit=1,
+            offset=1,
+            sort_by="overall_pass_rate",
+            sort_order="desc",
+        )
+
+        total = repository.count_runs(
+            query=history_query,
+        )
+
+        runs = repository.list_runs(
+            query=history_query,
+        )
+
+        assert total == 2
+        assert len(runs) == 1
+        assert runs[0].id == second.id
+        assert runs[0].id != first.id
+        assert runs[0].id != excluded_quality_gate.id
+        assert runs[0].id != excluded_dataset.id
+
+        db.delete(first)
+        db.delete(second)
+        db.delete(excluded_quality_gate)
+        db.delete(excluded_dataset)
+        db.commit()
 
     finally:
         db.close()

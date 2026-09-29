@@ -14,7 +14,9 @@ from app.repositories.evaluation_history_filters import (
     EvaluationHistoryFilters,
     EvaluationHistoryQuery,
 )
-
+from app.ai.evaluation.evaluation_history import (
+    build_evaluation_history,
+)
 
 client = TestClient(app)
 
@@ -101,7 +103,9 @@ def test_get_latest_evaluation_when_none_exist(
 
 
 @patch("app.api.evaluations.EvaluationRepository")
+@patch("app.api.evaluations.fetch_evaluation_history")
 def test_get_evaluation_history(
+    mock_fetch_history,
     mock_repository,
 ):
     runs = [
@@ -115,8 +119,12 @@ def test_get_evaluation_history(
         ),
     ]
 
-    mock_repository.return_value.list_runs.return_value = runs
-    mock_repository.return_value.count_runs.return_value = 5
+    mock_fetch_history.return_value = build_evaluation_history(
+        runs,
+        limit=2,
+        offset=2,
+        total=5,
+    )
 
     response = client.get(
         "/api/v1/evaluations/history",
@@ -149,26 +157,16 @@ def test_get_evaluation_history(
         sort_order="asc",
     )
 
-    mock_repository.return_value.count_runs.assert_called_once_with(
-        query=expected_query,
+    mock_fetch_history.assert_called_once_with(
+        mock_repository.return_value,
+        expected_query,
     )
-
-    mock_repository.return_value.list_runs.assert_called_once_with(
-        query=expected_query,
-    )
-    count_query = mock_repository.return_value.count_runs.call_args.kwargs["query"]
-
-    list_query = mock_repository.return_value.list_runs.call_args.kwargs["query"]
-
-    assert count_query is list_query
 
     assert response.status_code == 200
 
     data = response.json()
 
-    assert "runs" in data
     assert len(data["runs"]) == 2
-
     assert data["runs"][0]["id"] == 2
     assert data["runs"][0]["dataset_name"] == "rag-evaluation-v2"
     assert data["runs"][0]["status"] == "completed"
@@ -214,32 +212,33 @@ def test_get_evaluation_history_rejects_negative_offset():
 
 
 @patch("app.api.evaluations.EvaluationRepository")
+@patch("app.api.evaluations.fetch_evaluation_history")
 def test_get_evaluation_history_uses_default_sorting(
+    mock_fetch_history,
     mock_repository,
 ):
-    mock_repository.return_value.count_runs.return_value = 0
-    mock_repository.return_value.list_runs.return_value = []
+    mock_fetch_history.return_value = build_evaluation_history(
+        [],
+        limit=10,
+        offset=0,
+        total=0,
+    )
 
     response = client.get("/api/v1/evaluations/history")
 
     assert response.status_code == 200
 
-    expected_filters = EvaluationHistoryFilters()
-
     expected_query = EvaluationHistoryQuery(
-        filters=expected_filters,
+        filters=EvaluationHistoryFilters(),
         limit=10,
         offset=0,
         sort_by="created_at",
         sort_order="desc",
     )
 
-    mock_repository.return_value.count_runs.assert_called_once_with(
-        query=expected_query,
-    )
-
-    mock_repository.return_value.list_runs.assert_called_once_with(
-        query=expected_query,
+    mock_fetch_history.assert_called_once_with(
+        mock_repository.return_value,
+        expected_query,
     )
 
 
@@ -1918,65 +1917,68 @@ def test_get_evaluation_deployment_readiness_no_evaluation():
 
 
 @patch("app.api.evaluations.EvaluationRepository")
+@patch("app.api.evaluations.fetch_evaluation_history")
 def test_get_evaluation_history_with_quality_gate_filter(
+    mock_fetch_history,
     mock_repository,
 ):
-    mock_repository.return_value.count_runs.return_value = 2
-    mock_repository.return_value.list_runs.return_value = []
+    mock_fetch_history.return_value = build_evaluation_history(
+        [],
+        limit=10,
+        offset=0,
+        total=2,
+    )
 
     response = client.get("/api/v1/evaluations/history?quality_gate_passed=false")
 
     assert response.status_code == 200
 
-    expected_filters = EvaluationHistoryFilters(
-        quality_gate_passed=False,
-    )
     expected_query = EvaluationHistoryQuery(
-        filters=expected_filters,
+        filters=EvaluationHistoryFilters(
+            quality_gate_passed=False,
+        ),
         limit=10,
         offset=0,
         sort_by="created_at",
         sort_order="desc",
     )
 
-    mock_repository.return_value.count_runs.assert_called_once_with(
-        query=expected_query,
-    )
-
-    mock_repository.return_value.list_runs.assert_called_once_with(
-        query=expected_query,
+    mock_fetch_history.assert_called_once_with(
+        mock_repository.return_value,
+        expected_query,
     )
 
 
 @patch("app.api.evaluations.EvaluationRepository")
+@patch("app.api.evaluations.fetch_evaluation_history")
 def test_get_evaluation_history_with_status_filter(
+    mock_fetch_history,
     mock_repository,
 ):
-    mock_repository.return_value.count_runs.return_value = 3
-    mock_repository.return_value.list_runs.return_value = []
+    mock_fetch_history.return_value = build_evaluation_history(
+        [],
+        limit=10,
+        offset=0,
+        total=3,
+    )
 
     response = client.get("/api/v1/evaluations/history?status=failed")
 
     assert response.status_code == 200
 
-    expected_filters = EvaluationHistoryFilters(
-        status="failed",
-    )
-
     expected_query = EvaluationHistoryQuery(
-        filters=expected_filters,
+        filters=EvaluationHistoryFilters(
+            status="failed",
+        ),
         limit=10,
         offset=0,
         sort_by="created_at",
         sort_order="desc",
     )
 
-    mock_repository.return_value.count_runs.assert_called_once_with(
-        query=expected_query,
-    )
-
-    mock_repository.return_value.list_runs.assert_called_once_with(
-        query=expected_query,
+    mock_fetch_history.assert_called_once_with(
+        mock_repository.return_value,
+        expected_query,
     )
 
 
@@ -1992,12 +1994,18 @@ def test_get_evaluation_history_with_status_filter(
     ],
 )
 @patch("app.api.evaluations.EvaluationRepository")
+@patch("app.api.evaluations.fetch_evaluation_history")
 def test_get_evaluation_history_accepts_supported_sort_fields(
+    mock_fetch_history,
     mock_repository,
     sort_by,
 ):
-    mock_repository.return_value.count_runs.return_value = 0
-    mock_repository.return_value.list_runs.return_value = []
+    mock_fetch_history.return_value = build_evaluation_history(
+        [],
+        limit=10,
+        offset=0,
+        total=0,
+    )
 
     response = client.get(
         "/api/v1/evaluations/history",
@@ -2007,33 +2015,79 @@ def test_get_evaluation_history_accepts_supported_sort_fields(
         },
     )
 
-    expected_filters = EvaluationHistoryFilters()
+    assert response.status_code == 200
 
     expected_query = EvaluationHistoryQuery(
-        filters=expected_filters,
+        filters=EvaluationHistoryFilters(),
         limit=10,
         offset=0,
         sort_by=sort_by,
         sort_order="desc",
     )
 
-    mock_repository.return_value.count_runs.assert_called_once_with(
-        query=expected_query,
+    mock_fetch_history.assert_called_once_with(
+        mock_repository.return_value,
+        expected_query,
     )
 
-    mock_repository.return_value.list_runs.assert_called_once_with(
-        query=expected_query,
+
+@pytest.mark.parametrize(
+    "sort_order",
+    [
+        "asc",
+        "desc",
+    ],
+)
+@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.api.evaluations.fetch_evaluation_history")
+def test_get_evaluation_history_accepts_supported_sort_orders(
+    mock_fetch_history,
+    mock_repository,
+    sort_order,
+):
+    mock_fetch_history.return_value = build_evaluation_history(
+        [],
+        limit=10,
+        offset=0,
+        total=0,
+    )
+
+    response = client.get(
+        "/api/v1/evaluations/history",
+        params={
+            "sort_by": "created_at",
+            "sort_order": sort_order,
+        },
     )
 
     assert response.status_code == 200
 
+    expected_query = EvaluationHistoryQuery(
+        filters=EvaluationHistoryFilters(),
+        limit=10,
+        offset=0,
+        sort_by="created_at",
+        sort_order=sort_order,
+    )
+
+    mock_fetch_history.assert_called_once_with(
+        mock_repository.return_value,
+        expected_query,
+    )
+
 
 @patch("app.api.evaluations.EvaluationRepository")
+@patch("app.api.evaluations.fetch_evaluation_history")
 def test_get_evaluation_history_with_created_date_range(
+    mock_fetch_history,
     mock_repository,
 ):
-    mock_repository.return_value.count_runs.return_value = 4
-    mock_repository.return_value.list_runs.return_value = []
+    mock_fetch_history.return_value = build_evaluation_history(
+        [],
+        limit=10,
+        offset=0,
+        total=4,
+    )
 
     response = client.get(
         "/api/v1/evaluations/history",
@@ -2061,28 +2115,23 @@ def test_get_evaluation_history_with_created_date_range(
         59,
     )
 
-    expected_filters = EvaluationHistoryFilters(
-        created_after=expected_after,
-        created_before=expected_before,
-    )
-
     expected_query = EvaluationHistoryQuery(
-        filters=expected_filters,
+        filters=EvaluationHistoryFilters(
+            created_after=expected_after,
+            created_before=expected_before,
+        ),
         limit=10,
         offset=0,
         sort_by="created_at",
         sort_order="desc",
     )
 
-    mock_repository.return_value.count_runs.assert_called_once_with(
-        query=expected_query,
-    )
-
-    mock_repository.return_value.list_runs.assert_called_once_with(
-        query=expected_query,
-    )
-
     assert response.status_code == 200
+
+    mock_fetch_history.assert_called_once_with(
+        mock_repository.return_value,
+        expected_query,
+    )
 
 
 def test_get_evaluation_history_rejects_invalid_created_date_range():
@@ -2104,11 +2153,17 @@ def test_get_evaluation_history_rejects_invalid_created_date_range():
 
 
 @patch("app.api.evaluations.EvaluationRepository")
+@patch("app.api.evaluations.fetch_evaluation_history")
 def test_get_evaluation_history_with_created_after_only(
+    mock_fetch_history,
     mock_repository,
 ):
-    mock_repository.return_value.count_runs.return_value = 7
-    mock_repository.return_value.list_runs.return_value = []
+    mock_fetch_history.return_value = build_evaluation_history(
+        [],
+        limit=10,
+        offset=0,
+        total=7,
+    )
 
     response = client.get(
         "/api/v1/evaluations/history",
@@ -2126,27 +2181,22 @@ def test_get_evaluation_history_with_created_after_only(
         0,
     )
 
-    expected_filters = EvaluationHistoryFilters(
-        created_after=expected_after,
-    )
-
     expected_query = EvaluationHistoryQuery(
-        filters=expected_filters,
+        filters=EvaluationHistoryFilters(
+            created_after=expected_after,
+        ),
         limit=10,
         offset=0,
         sort_by="created_at",
         sort_order="desc",
     )
 
-    mock_repository.return_value.count_runs.assert_called_once_with(
-        query=expected_query,
-    )
-
-    mock_repository.return_value.list_runs.assert_called_once_with(
-        query=expected_query,
-    )
-
     assert response.status_code == 200
+
+    mock_fetch_history.assert_called_once_with(
+        mock_repository.return_value,
+        expected_query,
+    )
 
 
 @pytest.mark.parametrize(

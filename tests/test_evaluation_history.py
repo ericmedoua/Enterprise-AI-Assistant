@@ -186,22 +186,21 @@ def test_build_evaluation_history_with_pagination():
     assert result.pagination.has_previous is True
 
 
-def test_get_evaluation_history_uses_same_query_for_count_and_list():
+def test_get_evaluation_history_builds_and_reuses_query():
     repository = Mock()
 
     repository.count_runs.return_value = 3
     repository.list_runs.return_value = []
 
-    query = EvaluationHistoryQuery(
+    result = get_evaluation_history(
+        repository,
+        dataset_name="rag-evaluation-v1",
+        status="completed",
+        quality_gate_passed=True,
         limit=10,
         offset=2,
         sort_by="created_at",
         sort_order="desc",
-    )
-
-    result = get_evaluation_history(
-        repository,
-        query,
     )
 
     assert result.pagination is not None
@@ -209,15 +208,16 @@ def test_get_evaluation_history_uses_same_query_for_count_and_list():
     assert result.pagination.limit == 10
     assert result.pagination.offset == 2
 
-    repository.count_runs.assert_called_once_with(
-        query=query,
-    )
-
-    repository.list_runs.assert_called_once_with(
-        query=query,
-    )
-
     count_query = repository.count_runs.call_args.kwargs["query"]
     list_query = repository.list_runs.call_args.kwargs["query"]
 
     assert count_query is list_query
+
+    assert count_query.filters.dataset_name == "rag-evaluation-v1"
+    assert count_query.filters.status == "completed"
+    assert count_query.filters.quality_gate_passed is True
+
+    assert count_query.limit == 10
+    assert count_query.offset == 2
+    assert count_query.sort_by == "created_at"
+    assert count_query.sort_order == "desc"

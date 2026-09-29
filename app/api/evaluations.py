@@ -240,7 +240,8 @@ def get_evaluation_history(
             detail="created_after must be earlier than or equal to created_before.",
         )
 
-    history_filters = EvaluationHistoryFilters(
+    return fetch_evaluation_history(
+        repository,
         dataset_name=dataset_name,
         llm_model=llm_model,
         embedding_model=embedding_model,
@@ -248,19 +249,10 @@ def get_evaluation_history(
         quality_gate_passed=quality_gate_passed,
         created_after=created_after,
         created_before=created_before,
-    )
-
-    history_query = EvaluationHistoryQuery(
-        filters=history_filters,
         limit=limit,
         offset=offset,
         sort_by=sort_by,
         sort_order=sort_order,
-    )
-
-    return fetch_evaluation_history(
-        repository,
-        history_query,
     )
 
 

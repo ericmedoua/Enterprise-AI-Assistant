@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from app.ai.evaluation.evaluation_comparator import (
     EvaluationComparison,
     compare_evaluation_runs,
@@ -18,7 +20,11 @@ from app.schemas.evaluation import (
 )
 
 from app.repositories.evaluation_history_filters import (
+    EvaluationHistoryFilters,
     EvaluationHistoryQuery,
+    EvaluationHistorySortField,
+    EvaluationHistorySortOrder,
+    EvaluationStatus,
 )
 
 
@@ -49,27 +55,49 @@ def compare_latest_runs(
 
 def get_evaluation_history(
     repository: EvaluationRepository,
-    query: EvaluationHistoryQuery,
+    *,
+    dataset_name: str | None = None,
+    llm_model: str | None = None,
+    embedding_model: str | None = None,
+    status: EvaluationStatus | None = None,
+    quality_gate_passed: bool | None = None,
+    created_after: datetime | None = None,
+    created_before: datetime | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+    sort_by: EvaluationHistorySortField = "created_at",
+    sort_order: EvaluationHistorySortOrder = "desc",
 ) -> EvaluationHistoryResponse:
-    """
-    Retrieve evaluation history using one shared history query.
+    history_filters = EvaluationHistoryFilters(
+        dataset_name=dataset_name,
+        llm_model=llm_model,
+        embedding_model=embedding_model,
+        status=status,
+        quality_gate_passed=quality_gate_passed,
+        created_after=created_after,
+        created_before=created_before,
+    )
 
-    The same query is used for both the total count and
-    paginated result retrieval.
-    """
+    history_query = EvaluationHistoryQuery(
+        filters=history_filters,
+        limit=limit,
+        offset=offset,
+        sort_by=sort_by,
+        sort_order=sort_order,
+    )
 
     total = repository.count_runs(
-        query=query,
+        query=history_query,
     )
 
     runs = repository.list_runs(
-        query=query,
+        query=history_query,
     )
 
     return build_evaluation_history(
         runs,
-        limit=query.limit,
-        offset=query.offset,
+        limit=limit,
+        offset=offset,
         total=total,
     )
 

@@ -55,49 +55,20 @@ def compare_latest_runs(
 
 def get_evaluation_history(
     repository: EvaluationRepository,
-    *,
-    dataset_name: str | None = None,
-    llm_model: str | None = None,
-    embedding_model: str | None = None,
-    status: EvaluationStatus | None = None,
-    quality_gate_passed: bool | None = None,
-    created_after: datetime | None = None,
-    created_before: datetime | None = None,
-    limit: int | None = None,
-    offset: int = 0,
-    sort_by: EvaluationHistorySortField = "created_at",
-    sort_order: EvaluationHistorySortOrder = "desc",
+    query: EvaluationHistoryQuery,
 ) -> EvaluationHistoryResponse:
-    history_filters = EvaluationHistoryFilters(
-        dataset_name=dataset_name,
-        llm_model=llm_model,
-        embedding_model=embedding_model,
-        status=status,
-        quality_gate_passed=quality_gate_passed,
-        created_after=created_after,
-        created_before=created_before,
-    )
-
-    history_query = EvaluationHistoryQuery(
-        filters=history_filters,
-        limit=limit,
-        offset=offset,
-        sort_by=sort_by,
-        sort_order=sort_order,
-    )
-
     total = repository.count_runs(
-        query=history_query,
+        query=query,
     )
 
     runs = repository.list_runs(
-        query=history_query,
+        query=query,
     )
 
     return build_evaluation_history(
         runs,
-        limit=limit,
-        offset=offset,
+        limit=query.limit,
+        offset=query.offset,
         total=total,
     )
 

@@ -7,19 +7,25 @@ from app.repositories.evaluation_repository import (
     EvaluationRepository,
 )
 from app.schemas.evaluation import (
+    EvaluationComparisonResponse,
+    EvaluationDashboardHistoryResponse,
+    EvaluationDashboardResponse,
+    EvaluationDeploymentReadinessResponse,
+    EvaluationHistoricalTrendResponse,
+    EvaluationHistoricalTrendsResponse,
+    EvaluationHealthResponse,
     EvaluationHistoryResponse,
+    EvaluationInsightResponse,
+    EvaluationMetricPointResponse,
     EvaluationObservabilityResponse,
+    EvaluationQualityHealthResponse,
     EvaluationRunResponse,
+    EvaluationRunStartResponse,
     EvaluationSnapshotResponse,
-    EvaluationMetricTrendResponse,
     EvaluationTrendResponse,
     StaleEvaluationRunResponse,
     StaleEvaluationRunsResponse,
-    EvaluationHistoricalTrendResponse,
-    EvaluationHistoricalTrendsResponse,
-    EvaluationMetricPointResponse,
-    EvaluationInsightResponse,
-    EvaluationDeploymentReadinessResponse,
+    EvaluationMetricTrendResponse,
 )
 from app.ai.evaluation.evaluation_comparator import (
     compare_evaluation_runs,
@@ -50,20 +56,7 @@ from app.ai.evaluation.evaluation_snapshot import (
     EvaluationSnapshot,
 )
 
-from app.schemas.evaluation import (
-    EvaluationRunStartResponse,
-    EvaluationQualityHealthResponse,
-    EvaluationHealthResponse,
-    EvaluationDashboardHistoryResponse,
-    EvaluationHistoricalTrendResponse,
-    EvaluationMetricPointResponse,
-    EvaluationComparisonResponse,
-    EvaluationDashboardResponse,
-    EvaluationDeploymentReadinessResponse,
-    EvaluationHealthResponse,
-    EvaluationInsightResponse,
-    EvaluationQualityHealthResponse,
-)
+
 from app.core.constants import (
     EVALUATION_STATUS_QUEUED,
 )
@@ -76,14 +69,6 @@ from app.ai.evaluation.evaluation_duration import (
 )
 from app.ai.evaluation.evaluation_health import (
     evaluate_health,
-)
-
-from app.schemas.evaluation import (
-    EvaluationHealthResponse,
-)
-
-from app.ai.evaluation.evaluation_duration import (
-    calculate_duration_seconds,
 )
 
 from app.ai.evaluation.stale_evaluation import (
@@ -105,9 +90,6 @@ from app.ai.evaluation.evaluation_historical_trend_service import (
 )
 from app.ai.evaluation.evaluation_quality_health_service import (
     build_evaluation_quality_health,
-)
-from app.ai.evaluation.evaluation_health import (
-    evaluate_health,
 )
 from app.ai.evaluation.evaluation_dashboard_service import (
     build_evaluation_dashboard,
@@ -240,8 +222,7 @@ def get_evaluation_history(
             detail="created_after must be earlier than or equal to created_before.",
         )
 
-    return fetch_evaluation_history(
-        repository,
+    history_filters = EvaluationHistoryFilters(
         dataset_name=dataset_name,
         llm_model=llm_model,
         embedding_model=embedding_model,
@@ -249,10 +230,19 @@ def get_evaluation_history(
         quality_gate_passed=quality_gate_passed,
         created_after=created_after,
         created_before=created_before,
+    )
+
+    history_query = EvaluationHistoryQuery(
+        filters=history_filters,
         limit=limit,
         offset=offset,
         sort_by=sort_by,
         sort_order=sort_order,
+    )
+
+    return fetch_evaluation_history(
+        repository,
+        history_query,
     )
 
 

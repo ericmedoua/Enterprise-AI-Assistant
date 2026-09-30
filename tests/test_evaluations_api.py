@@ -2210,41 +2210,40 @@ def test_get_evaluation_history_with_created_after_only(
     ],
 )
 @patch("app.api.evaluations.EvaluationRepository")
+@patch("app.api.evaluations.fetch_evaluation_history")
 def test_get_evaluation_history_accepts_supported_statuses(
+    mock_fetch_history,
     mock_repository,
     status,
 ):
-    mock_repository.return_value.count_runs.return_value = 0
-    mock_repository.return_value.list_runs.return_value = []
+    mock_fetch_history.return_value = build_evaluation_history(
+        [],
+        limit=10,
+        offset=0,
+        total=0,
+    )
 
     response = client.get(
         "/api/v1/evaluations/history",
-        params={
-            "status": status,
-        },
-    )
-
-    expected_filters = EvaluationHistoryFilters(
-        status=status,
+        params={"status": status},
     )
 
     expected_query = EvaluationHistoryQuery(
-        filters=expected_filters,
+        filters=EvaluationHistoryFilters(
+            status=status,
+        ),
         limit=10,
         offset=0,
         sort_by="created_at",
         sort_order="desc",
     )
 
-    mock_repository.return_value.count_runs.assert_called_once_with(
-        query=expected_query,
-    )
-
-    mock_repository.return_value.list_runs.assert_called_once_with(
-        query=expected_query,
-    )
-
     assert response.status_code == 200
+
+    mock_fetch_history.assert_called_once_with(
+        mock_repository.return_value,
+        expected_query,
+    )
 
 
 def test_get_evaluation_history_rejects_invalid_status():
@@ -2259,11 +2258,17 @@ def test_get_evaluation_history_rejects_invalid_status():
 
 
 @patch("app.api.evaluations.EvaluationRepository")
+@patch("app.api.evaluations.fetch_evaluation_history")
 def test_get_evaluation_history_filters_completed_quality_gate_failed_runs(
+    mock_fetch_history,
     mock_repository,
 ):
-    mock_repository.return_value.count_runs.return_value = 3
-    mock_repository.return_value.list_runs.return_value = []
+    mock_fetch_history.return_value = build_evaluation_history(
+        [],
+        limit=10,
+        offset=0,
+        total=3,
+    )
 
     response = client.get(
         "/api/v1/evaluations/history",
@@ -2273,25 +2278,20 @@ def test_get_evaluation_history_filters_completed_quality_gate_failed_runs(
         },
     )
 
-    expected_filters = EvaluationHistoryFilters(
-        status="failed",
-        quality_gate_passed=False,
-    )
-
     expected_query = EvaluationHistoryQuery(
-        filters=expected_filters,
+        filters=EvaluationHistoryFilters(
+            status="failed",
+            quality_gate_passed=False,
+        ),
         limit=10,
         offset=0,
         sort_by="created_at",
         sort_order="desc",
     )
 
-    mock_repository.return_value.count_runs.assert_called_once_with(
-        query=expected_query,
-    )
-
-    mock_repository.return_value.list_runs.assert_called_once_with(
-        query=expected_query,
-    )
-
     assert response.status_code == 200
+
+    mock_fetch_history.assert_called_once_with(
+        mock_repository.return_value,
+        expected_query,
+    )

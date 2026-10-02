@@ -108,6 +108,10 @@ from app.repositories.evaluation_history_filters import (
     EvaluationStatus,
 )
 
+from app.ai.evaluation.evaluation_latest_service import (
+    get_latest_evaluation_run,
+)
+
 
 router = APIRouter(
     prefix="/evaluations",
@@ -175,7 +179,7 @@ def get_latest_evaluation(
 ):
     repository = EvaluationRepository(db)
 
-    run = repository.get_latest_run()
+    run = get_latest_evaluation_run(repository)
 
     if run is None:
         raise HTTPException(

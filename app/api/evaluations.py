@@ -111,7 +111,9 @@ from app.repositories.evaluation_history_filters import (
 from app.ai.evaluation.evaluation_latest_service import (
     get_latest_evaluation_run,
 )
-
+from app.ai.evaluation.evaluation_health_service import (
+    build_evaluation_health,
+)
 
 router = APIRouter(
     prefix="/evaluations",
@@ -324,14 +326,7 @@ def get_evaluation_health(
 ):
     repository = EvaluationRepository(db)
 
-    running_runs = repository.list_running_runs()
-
-    cancelled_count = repository.count_cancelled_runs()
-
-    health = evaluate_health(
-        running_runs,
-        cancelled_count=cancelled_count,
-    )
+    health = build_evaluation_health(repository)
 
     return EvaluationHealthResponse(
         healthy=health.healthy,

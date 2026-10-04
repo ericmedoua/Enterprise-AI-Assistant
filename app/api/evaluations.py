@@ -114,6 +114,9 @@ from app.ai.evaluation.evaluation_latest_service import (
 from app.ai.evaluation.evaluation_health_service import (
     build_evaluation_health,
 )
+from app.ai.evaluation.evaluation_stale_service import (
+    get_running_evaluation_runs,
+)
 
 router = APIRouter(
     prefix="/evaluations",
@@ -345,7 +348,7 @@ def get_stale_evaluations(
 ):
     repository = EvaluationRepository(db)
 
-    running_runs = repository.list_running_runs()
+    running_runs = get_running_evaluation_runs(repository)
 
     stale_runs = []
 

@@ -390,7 +390,7 @@ def get_latest_evaluation_observability(
 ):
     repository = EvaluationRepository(db)
 
-    run = repository.get_latest_run()
+    run = get_latest_evaluation_run(repository)
 
     if run is None:
         raise HTTPException(

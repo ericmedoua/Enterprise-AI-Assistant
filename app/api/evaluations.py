@@ -118,6 +118,10 @@ from app.ai.evaluation.evaluation_stale_service import (
     get_running_evaluation_runs,
 )
 
+from app.ai.evaluation.evaluation_observability_history_service import (
+    get_evaluation_observability_history as fetch_evaluation_observability_history,
+)
+
 router = APIRouter(
     prefix="/evaluations",
     tags=["Evaluations"],
@@ -427,9 +431,7 @@ def get_evaluation_observability_history(
 ):
     repository = EvaluationRepository(db)
 
-    runs = repository.list_runs()
-
-    return build_evaluation_history(runs)
+    return fetch_evaluation_observability_history(repository)
 
 
 @router.get(

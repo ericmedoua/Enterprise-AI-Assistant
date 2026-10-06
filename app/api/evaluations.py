@@ -121,6 +121,9 @@ from app.ai.evaluation.evaluation_stale_service import (
 from app.ai.evaluation.evaluation_observability_history_service import (
     get_evaluation_observability_history as fetch_evaluation_observability_history,
 )
+from app.ai.evaluation.evaluation_run_service import (
+    get_evaluation_run_by_id,
+)
 
 router = APIRouter(
     prefix="/evaluations",
@@ -589,7 +592,10 @@ def fail_stale_evaluation(
 ):
     repository = EvaluationRepository(db)
 
-    run = repository.get_run(run_id)
+    run = get_evaluation_run_by_id(
+        repository,
+        run_id,
+    )
 
     if run is None:
         raise HTTPException(
@@ -620,7 +626,10 @@ def cancel_evaluation_run(
 ):
     repository = EvaluationRepository(db)
 
-    run = repository.get_run(run_id)
+    run = get_evaluation_run_by_id(
+        repository,
+        run_id,
+    )
 
     if run is None:
         raise HTTPException(
@@ -651,7 +660,10 @@ def get_evaluation_run(
 ):
     repository = EvaluationRepository(db)
 
-    run = repository.get_run(run_id)
+    run = get_evaluation_run_by_id(
+        repository,
+        run_id,
+    )
 
     if run is None:
         raise HTTPException(

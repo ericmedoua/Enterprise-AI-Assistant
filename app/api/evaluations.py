@@ -124,6 +124,9 @@ from app.ai.evaluation.evaluation_observability_history_service import (
 from app.ai.evaluation.evaluation_run_service import (
     get_evaluation_run_by_id,
 )
+from app.ai.evaluation.evaluation_previous_run_service import (
+    get_previous_evaluation_run,
+)
 
 router = APIRouter(
     prefix="/evaluations",
@@ -692,7 +695,10 @@ def get_evaluation_comparison(
             detail="Evaluation run not found.",
         )
 
-    previous = repository.get_previous_run(run_id)
+    previous = get_previous_evaluation_run(
+        repository,
+        run_id,
+    )
 
     if previous is None:
         raise HTTPException(

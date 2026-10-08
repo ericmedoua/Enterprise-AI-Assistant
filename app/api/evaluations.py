@@ -687,7 +687,10 @@ def get_evaluation_comparison(
 ):
     repository = EvaluationRepository(db)
 
-    current = repository.get_run(run_id)
+    current = get_evaluation_run_by_id(
+        repository,
+        run_id,
+    )
 
     if current is None:
         raise HTTPException(
@@ -730,7 +733,10 @@ def get_evaluation_snapshot(
 ):
     repository = EvaluationRepository(db)
 
-    run = repository.get_run(run_id)
+    run = get_evaluation_run_by_id(
+        repository,
+        run_id,
+    )
 
     if run is None:
         raise HTTPException(
@@ -738,7 +744,10 @@ def get_evaluation_snapshot(
             detail="Evaluation run not found.",
         )
 
-    previous = repository.get_previous_run(run_id)
+    previous = get_previous_evaluation_run(
+        repository,
+        run_id,
+    )
 
     comparison = None
 

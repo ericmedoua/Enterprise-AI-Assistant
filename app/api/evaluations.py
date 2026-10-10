@@ -127,6 +127,10 @@ from app.ai.evaluation.evaluation_run_service import (
 from app.ai.evaluation.evaluation_previous_run_service import (
     get_previous_evaluation_run,
 )
+from app.ai.evaluation.evaluation_run_mutation_service import (
+    cancel_queued_evaluation_run,
+    fail_stale_evaluation_run,
+)
 
 router = APIRouter(
     prefix="/evaluations",
@@ -606,8 +610,9 @@ def fail_stale_evaluation(
             detail="Evaluation run not found.",
         )
 
-    updated_run = repository.fail_stale_run(
-        run_id=run_id,
+    updated_run = fail_stale_evaluation_run(
+        repository,
+        run_id,
     )
 
     if updated_run is None:
@@ -640,8 +645,9 @@ def cancel_evaluation_run(
             detail="Evaluation run not found.",
         )
 
-    cancelled_run = repository.cancel_queued_run(
-        run_id=run_id,
+    cancelled_run = cancel_queued_evaluation_run(
+        repository,
+        run_id,
     )
 
     if cancelled_run is None:

@@ -131,6 +131,9 @@ from app.ai.evaluation.evaluation_run_mutation_service import (
     cancel_queued_evaluation_run,
     fail_stale_evaluation_run,
 )
+from app.repositories.dependencies import (
+    get_evaluation_repository,
+)
 
 router = APIRouter(
     prefix="/evaluations",
@@ -194,10 +197,10 @@ def _execute_evaluation_in_background(
     response_model=EvaluationRunResponse,
 )
 def get_latest_evaluation(
-    db: Session = Depends(get_db),
+    repository: EvaluationRepository = Depends(
+        get_evaluation_repository,
+    ),
 ):
-    repository = EvaluationRepository(db)
-
     run = get_latest_evaluation_run(repository)
 
     if run is None:

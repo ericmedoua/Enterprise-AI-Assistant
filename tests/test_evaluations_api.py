@@ -59,7 +59,7 @@ def make_evaluation_run(
     )
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 def test_get_latest_evaluation(
     mock_repository,
 ):
@@ -86,7 +86,7 @@ def test_get_latest_evaluation(
     assert data["quality_gate_passed"] is True
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 def test_get_latest_evaluation_when_none_exist(
     mock_repository,
 ):

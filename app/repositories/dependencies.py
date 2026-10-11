@@ -7,6 +7,9 @@ from app.database.session import get_db
 from app.repositories.chat_repository import (
     ChatRepository,
 )
+from app.repositories.evaluation_repository import (
+    EvaluationRepository,
+)
 
 
 def get_chat_repository(
@@ -14,3 +17,10 @@ def get_chat_repository(
 ):
 
     return ChatRepository(db)
+
+
+def get_evaluation_repository(
+    db: Session = Depends(get_db),
+):
+
+    return EvaluationRepository(db)

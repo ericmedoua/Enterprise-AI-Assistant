@@ -217,7 +217,9 @@ def get_latest_evaluation(
     response_model=EvaluationHistoryResponse,
 )
 def get_evaluation_history(
-    db: Session = Depends(get_db),
+    repository: EvaluationRepository = Depends(
+        get_evaluation_repository,
+    ),
     limit: int = Query(default=10, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     dataset_name: str | None = Query(default=None),
@@ -236,7 +238,6 @@ def get_evaluation_history(
         default="desc",
     ),
 ):
-    repository = EvaluationRepository(db)
 
     if (
         created_after is not None
@@ -277,10 +278,10 @@ def get_evaluation_history(
     response_model=EvaluationDashboardResponse,
 )
 def get_evaluation_dashboard(
-    db: Session = Depends(get_db),
+    repository: EvaluationRepository = Depends(
+        get_evaluation_repository,
+    ),
 ):
-    repository = EvaluationRepository(db)
-
     try:
         dashboard = build_evaluation_dashboard(repository)
     except ValueError as exc:
@@ -342,10 +343,10 @@ def get_evaluation_dashboard(
     response_model=EvaluationHealthResponse,
 )
 def get_evaluation_health(
-    db: Session = Depends(get_db),
+    repository: EvaluationRepository = Depends(
+        get_evaluation_repository,
+    ),
 ):
-    repository = EvaluationRepository(db)
-
     health = build_evaluation_health(repository)
 
     return EvaluationHealthResponse(
@@ -361,10 +362,8 @@ def get_evaluation_health(
     response_model=StaleEvaluationRunsResponse,
 )
 def get_stale_evaluations(
-    db: Session = Depends(get_db),
+    repository: EvaluationRepository = Depends(get_evaluation_repository),
 ):
-    repository = EvaluationRepository(db)
-
     running_runs = get_running_evaluation_runs(repository)
 
     stale_runs = []
@@ -403,10 +402,8 @@ def get_stale_evaluations(
     response_model=EvaluationObservabilityResponse,
 )
 def get_latest_evaluation_observability(
-    db: Session = Depends(get_db),
+    repository: EvaluationRepository = Depends(get_evaluation_repository),
 ):
-    repository = EvaluationRepository(db)
-
     run = get_latest_evaluation_run(repository)
 
     if run is None:
@@ -440,10 +437,8 @@ def get_latest_evaluation_observability(
     response_model=EvaluationHistoryResponse,
 )
 def get_evaluation_observability_history(
-    db: Session = Depends(get_db),
+    repository: EvaluationRepository = Depends(get_evaluation_repository),
 ):
-    repository = EvaluationRepository(db)
-
     return fetch_evaluation_observability_history(repository)
 
 

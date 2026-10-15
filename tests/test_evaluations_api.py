@@ -102,7 +102,7 @@ def test_get_latest_evaluation_when_none_exist(
     }
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 @patch("app.api.evaluations.fetch_evaluation_history")
 def test_get_evaluation_history(
     mock_fetch_history,
@@ -211,7 +211,7 @@ def test_get_evaluation_history_rejects_negative_offset():
     assert response.status_code == 422
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 @patch("app.api.evaluations.fetch_evaluation_history")
 def test_get_evaluation_history_uses_default_sorting(
     mock_fetch_history,
@@ -242,7 +242,7 @@ def test_get_evaluation_history_uses_default_sorting(
     )
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 def test_get_evaluation_run(
     mock_repository,
 ):
@@ -262,7 +262,7 @@ def test_get_evaluation_run(
     assert data["dataset_name"] == ("rag-evaluation-v1")
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 def test_get_evaluation_run_not_found(
     mock_repository,
 ):
@@ -724,7 +724,7 @@ def test_get_evaluation_run_without_duration(
     assert data["duration_seconds"] is None
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 def test_get_evaluation_health(
     mock_repository,
 ):
@@ -749,7 +749,7 @@ def test_get_evaluation_health(
     assert data["cancelled_count"] == 2
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 def test_get_evaluation_health_without_running_runs(
     mock_repository,
 ):
@@ -772,7 +772,7 @@ def test_get_evaluation_health_without_running_runs(
     "app.api.evaluations.is_evaluation_stale",
 )
 @patch(
-    "app.api.evaluations.EvaluationRepository",
+    "app.repositories.dependencies.EvaluationRepository",
 )
 def test_get_stale_evaluations(
     mock_repository,
@@ -805,7 +805,7 @@ def test_get_stale_evaluations(
     mock_is_stale.assert_called_once()
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 def test_get_stale_evaluations_when_none_exist(
     mock_repository,
 ):
@@ -961,7 +961,7 @@ def test_cancel_running_evaluation(
     }
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 def test_get_latest_evaluation_observability(
     mock_repository,
 ):
@@ -1010,7 +1010,7 @@ def test_get_latest_evaluation_observability(
     assert data["duration_seconds"] == pytest.approx(10.0)
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 def test_get_latest_evaluation_observability_when_none_exist(
     mock_repository,
 ):
@@ -1026,7 +1026,7 @@ def test_get_latest_evaluation_observability_when_none_exist(
     assert data["error"] == ("No evaluation runs found.")
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 def test_get_evaluation_observability_history(
     mock_repository,
 ):
@@ -1060,7 +1060,7 @@ def test_get_evaluation_observability_history(
     mock_repository.return_value.list_runs.assert_called_once()
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 def test_get_evaluation_observability_history_empty(
     mock_repository,
 ):
@@ -1916,7 +1916,7 @@ def test_get_evaluation_deployment_readiness_no_evaluation():
     assert data["reason"] == ("No evaluation run is available.")
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 @patch("app.api.evaluations.fetch_evaluation_history")
 def test_get_evaluation_history_with_quality_gate_filter(
     mock_fetch_history,
@@ -1949,7 +1949,7 @@ def test_get_evaluation_history_with_quality_gate_filter(
     )
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 @patch("app.api.evaluations.fetch_evaluation_history")
 def test_get_evaluation_history_with_status_filter(
     mock_fetch_history,
@@ -1993,7 +1993,7 @@ def test_get_evaluation_history_with_status_filter(
         "overall_pass_rate",
     ],
 )
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 @patch("app.api.evaluations.fetch_evaluation_history")
 def test_get_evaluation_history_accepts_supported_sort_fields(
     mock_fetch_history,
@@ -2038,7 +2038,7 @@ def test_get_evaluation_history_accepts_supported_sort_fields(
         "desc",
     ],
 )
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 @patch("app.api.evaluations.fetch_evaluation_history")
 def test_get_evaluation_history_accepts_supported_sort_orders(
     mock_fetch_history,
@@ -2076,7 +2076,7 @@ def test_get_evaluation_history_accepts_supported_sort_orders(
     )
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 @patch("app.api.evaluations.fetch_evaluation_history")
 def test_get_evaluation_history_with_created_date_range(
     mock_fetch_history,
@@ -2152,7 +2152,7 @@ def test_get_evaluation_history_rejects_invalid_created_date_range():
     )
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 @patch("app.api.evaluations.fetch_evaluation_history")
 def test_get_evaluation_history_with_created_after_only(
     mock_fetch_history,
@@ -2209,7 +2209,7 @@ def test_get_evaluation_history_with_created_after_only(
         "cancelled",
     ],
 )
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 @patch("app.api.evaluations.fetch_evaluation_history")
 def test_get_evaluation_history_accepts_supported_statuses(
     mock_fetch_history,
@@ -2257,7 +2257,7 @@ def test_get_evaluation_history_rejects_invalid_status():
     assert response.status_code == 422
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 @patch("app.api.evaluations.fetch_evaluation_history")
 def test_get_evaluation_history_filters_completed_quality_gate_failed_runs(
     mock_fetch_history,

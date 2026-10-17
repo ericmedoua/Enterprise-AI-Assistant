@@ -593,10 +593,10 @@ def get_evaluation_deployment_readiness(
 )
 def fail_stale_evaluation(
     run_id: int,
-    db: Session = Depends(get_db),
+    repository: EvaluationRepository = Depends(
+        get_evaluation_repository,
+    ),
 ):
-    repository = EvaluationRepository(db)
-
     run = get_evaluation_run_by_id(
         repository,
         run_id,
@@ -628,10 +628,10 @@ def fail_stale_evaluation(
 )
 def cancel_evaluation_run(
     run_id: int,
-    db: Session = Depends(get_db),
+    repository: EvaluationRepository = Depends(
+        get_evaluation_repository,
+    ),
 ):
-    repository = EvaluationRepository(db)
-
     run = get_evaluation_run_by_id(
         repository,
         run_id,
@@ -663,10 +663,10 @@ def cancel_evaluation_run(
 )
 def get_evaluation_run(
     run_id: int,
-    db: Session = Depends(get_db),
+    repository: EvaluationRepository = Depends(
+        get_evaluation_repository,
+    ),
 ):
-    repository = EvaluationRepository(db)
-
     run = get_evaluation_run_by_id(
         repository,
         run_id,
@@ -687,10 +687,10 @@ def get_evaluation_run(
 )
 def get_evaluation_comparison(
     run_id: int,
-    db: Session = Depends(get_db),
+    repository: EvaluationRepository = Depends(
+        get_evaluation_repository,
+    ),
 ):
-    repository = EvaluationRepository(db)
-
     current = get_evaluation_run_by_id(
         repository,
         run_id,
@@ -733,10 +733,10 @@ def get_evaluation_comparison(
 )
 def get_evaluation_snapshot(
     run_id: int,
-    db: Session = Depends(get_db),
+    repository: EvaluationRepository = Depends(
+        get_evaluation_repository,
+    ),
 ):
-    repository = EvaluationRepository(db)
-
     run = get_evaluation_run_by_id(
         repository,
         run_id,
@@ -804,12 +804,14 @@ def get_evaluation_snapshot(
 )
 def start_evaluation_run(
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
+    repository: EvaluationRepository = Depends(
+        get_evaluation_repository,
+    ),
 ):
     metadata = get_evaluation_metadata()
 
     runner = EvaluationRunner(
-        db=db,
+        repository=repository,
         metadata=metadata,
     )
 

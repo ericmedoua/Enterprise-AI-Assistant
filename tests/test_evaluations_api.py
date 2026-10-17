@@ -17,8 +17,29 @@ from app.repositories.evaluation_history_filters import (
 from app.ai.evaluation.evaluation_history import (
     build_evaluation_history,
 )
+from app.repositories.dependencies import get_evaluation_repository
 
 client = TestClient(app)
+
+
+@pytest.fixture
+def evaluation_repository_override():
+    previous = app.dependency_overrides.get(
+        get_evaluation_repository,
+    )
+
+    def override(repository):
+        app.dependency_overrides[get_evaluation_repository] = lambda: repository
+
+    yield override
+
+    if previous is None:
+        app.dependency_overrides.pop(
+            get_evaluation_repository,
+            None,
+        )
+    else:
+        app.dependency_overrides[get_evaluation_repository] = previous
 
 
 def make_evaluation_run(
@@ -242,7 +263,7 @@ def test_get_evaluation_history_uses_default_sorting(
     )
 
 
-@patch("app.repositories.dependencies.EvaluationRepository")
+@patch("app.api.evaluations.EvaluationRepository")
 def test_get_evaluation_run(
     mock_repository,
 ):
@@ -262,7 +283,7 @@ def test_get_evaluation_run(
     assert data["dataset_name"] == ("rag-evaluation-v1")
 
 
-@patch("app.repositories.dependencies.EvaluationRepository")
+@patch("app.api.evaluations.EvaluationRepository")
 def test_get_evaluation_run_not_found(
     mock_repository,
 ):
@@ -278,7 +299,7 @@ def test_get_evaluation_run_not_found(
     }
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 def test_get_evaluation_comparison(
     mock_repository,
 ):
@@ -311,7 +332,7 @@ def test_get_evaluation_comparison(
     assert data["overall_pass_rate_delta"] == pytest.approx(-0.50)
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 def test_get_evaluation_comparison_without_previous(
     mock_repository,
 ):
@@ -333,7 +354,7 @@ def test_get_evaluation_comparison_without_previous(
     }
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 def test_get_evaluation_comparison_run_not_found(
     mock_repository,
 ):
@@ -349,7 +370,7 @@ def test_get_evaluation_comparison_run_not_found(
     }
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 def test_get_evaluation_snapshot(
     mock_repository,
 ):
@@ -383,7 +404,7 @@ def test_get_evaluation_snapshot(
     assert data["comparison"]["groundedness_delta"] == pytest.approx(-0.25)
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 def test_get_evaluation_snapshot_without_history(
     mock_repository,
 ):
@@ -555,7 +576,7 @@ def test_start_evaluation_run(
     mock_runner.return_value.execute_run.assert_called_once_with(42)
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 def test_get_evaluation_run_status(
     mock_repository,
 ):
@@ -693,7 +714,7 @@ def test_execute_evaluation_in_background_closes_session_on_failure(
     db.close.assert_called_once()
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 def test_get_evaluation_run_without_duration(
     mock_repository,
 ):
@@ -820,7 +841,7 @@ def test_get_stale_evaluations_when_none_exist(
     assert data["runs"] == []
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 def test_fail_stale_evaluation(
     mock_repository,
 ):
@@ -866,7 +887,7 @@ def test_fail_stale_evaluation_not_found(
     mock_repository.return_value.fail_stale_run.assert_not_called()
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 def test_fail_stale_evaluation_conflict(
     mock_repository,
 ):
@@ -890,7 +911,7 @@ def test_fail_stale_evaluation_conflict(
     }
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 def test_cancel_queued_evaluation(
     mock_repository,
 ):
@@ -937,7 +958,7 @@ def test_cancel_evaluation_not_found(
     mock_repository.return_value.cancel_queued_run.assert_not_called()
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 def test_cancel_running_evaluation(
     mock_repository,
 ):

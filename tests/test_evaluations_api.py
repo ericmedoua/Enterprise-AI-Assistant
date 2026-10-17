@@ -263,7 +263,7 @@ def test_get_evaluation_history_uses_default_sorting(
     )
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 def test_get_evaluation_run(
     mock_repository,
 ):
@@ -869,7 +869,7 @@ def test_fail_stale_evaluation(
     )
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 def test_fail_stale_evaluation_not_found(
     mock_repository,
 ):
@@ -940,7 +940,7 @@ def test_cancel_queued_evaluation(
     )
 
 
-@patch("app.api.evaluations.EvaluationRepository")
+@patch("app.repositories.dependencies.EvaluationRepository")
 def test_cancel_evaluation_not_found(
     mock_repository,
 ):

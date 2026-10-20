@@ -56,3 +56,4 @@ htmlcov/
 k8s/secret.yamlk8s/secret.yaml
 
 k8s/secret.yaml
+project_backup.zip

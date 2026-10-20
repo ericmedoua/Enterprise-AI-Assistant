@@ -1,6 +1,6 @@
 import pytest
 
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
 from fastapi.testclient import TestClient
@@ -8,7 +8,6 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.models.evaluation_run import EvaluationRun
 
-from datetime import datetime, timedelta, timezone
 
 from app.repositories.evaluation_history_filters import (
     EvaluationHistoryFilters,
@@ -17,29 +16,8 @@ from app.repositories.evaluation_history_filters import (
 from app.ai.evaluation.evaluation_history import (
     build_evaluation_history,
 )
-from app.repositories.dependencies import get_evaluation_repository
 
 client = TestClient(app)
-
-
-@pytest.fixture
-def evaluation_repository_override():
-    previous = app.dependency_overrides.get(
-        get_evaluation_repository,
-    )
-
-    def override(repository):
-        app.dependency_overrides[get_evaluation_repository] = lambda: repository
-
-    yield override
-
-    if previous is None:
-        app.dependency_overrides.pop(
-            get_evaluation_repository,
-            None,
-        )
-    else:
-        app.dependency_overrides[get_evaluation_repository] = previous
 
 
 def make_evaluation_run(
@@ -869,7 +847,7 @@ def test_fail_stale_evaluation(
     )
 
 
-@patch("app.repositories.dependencies.EvaluationRepository")
+@patch("app.api.evaluations.EvaluationRepository")
 def test_fail_stale_evaluation_not_found(
     mock_repository,
 ):
@@ -940,7 +918,7 @@ def test_cancel_queued_evaluation(
     )
 
 
-@patch("app.repositories.dependencies.EvaluationRepository")
+@patch("app.api.evaluations.EvaluationRepository")
 def test_cancel_evaluation_not_found(
     mock_repository,
 ):

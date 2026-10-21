@@ -117,3 +117,23 @@ class DocumentRepository:
             raise
 
         return document
+
+    def delete_owned_document(
+        self,
+        document_id: str,
+        owner_id: int,
+    ) -> bool:
+        """Delete a document record only if it belongs to the given owner."""
+        document = self.get_owned_document(document_id, owner_id)
+
+        if document is None:
+            return False
+
+        try:
+            self.db.delete(document)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+
+        return True

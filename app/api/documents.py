@@ -15,6 +15,8 @@ from app.models.user import User
 from app.repositories.document_repository import DocumentRepository
 from app.repositories.dependencies import get_document_repository
 from app.schemas.document import DocumentResponse
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile
+from app.ai.retrieval.dependencies import get_chroma_service
 
 logger = logging.getLogger(__name__)
 
@@ -134,3 +136,99 @@ def list_documents(
     repository: DocumentRepository = Depends(get_document_repository),
 ):
     return repository.list_by_owner(current_user.id)
+
+
+@router.delete("/{document_id}")
+def delete_document(
+    document_id: str,
+    current_user: User = Depends(get_current_user),
+    repository: DocumentRepository = Depends(get_document_repository),
+    chroma_service=Depends(get_chroma_service),
+):
+    document = repository.get_owned_document(
+        document_id,
+        current_user.id,
+    )
+
+    # Do not reveal whether another user's document exists.
+    if document is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found.",
+        )
+
+    # Avoid racing with the background indexing worker.
+    if document.status == "indexing":
+        raise HTTPException(
+            status_code=409,
+            detail="Document is still indexing. Try again later.",
+        )
+
+    # Resolve and validate the storage path before touching any data.
+    storage_root = UPLOAD_DIRECTORY.resolve()
+    file_path = (storage_root / document.stored_filename).resolve()
+
+    if file_path.parent != storage_root or file_path.name != document.stored_filename:
+        logger.error(
+            "Unsafe document storage path for document_id=%s",
+            document_id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Document storage path is invalid.",
+        )
+
+    # Each operation must succeed before proceeding to the next.
+    try:
+        chroma_service.delete_document(
+            owner_id=current_user.id,
+            document_id=document.id,
+        )
+    except Exception as exc:
+        logger.exception(
+            "Could not delete document vectors: document_id=%s",
+            document_id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Could not delete document vectors.",
+        ) from exc
+
+    try:
+        file_path.unlink(missing_ok=True)
+    except OSError as exc:
+        logger.exception(
+            "Could not delete stored document file: document_id=%s",
+            document_id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Could not delete stored document file.",
+        ) from exc
+
+    try:
+        deleted = repository.delete_owned_document(
+            document_id,
+            current_user.id,
+        )
+        if not deleted:
+            raise HTTPException(
+                status_code=404,
+                detail="Document not found.",
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception(
+            "Could not delete document registry record: document_id=%s",
+            document_id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Could not delete document record.",
+        ) from exc
+
+    return {
+        "message": "Document deleted successfully.",
+        "document_id": document_id,
+    }

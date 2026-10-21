@@ -23,6 +23,22 @@ class ChromaService:
             return
         self.vectorstore.add_documents(documents)
 
+    def delete_document(
+        self,
+        *,
+        owner_id: str | int,
+        document_id: str,
+    ) -> None:
+        """Delete vectors belonging only to the specified owner's document."""
+        self.vectorstore.delete(
+            where={
+                "$and": [
+                    {"owner_id": str(owner_id)},
+                    {"document_id": str(document_id)},
+                ]
+            }
+        )
+
     def similarity_search(self, query: str, k: int = 4):
         return self.vectorstore.similarity_search(query, k=k)
 

@@ -100,3 +100,26 @@ def test_indexed_status_requires_chunk_count(db, test_user):
 
     with pytest.raises(ValueError, match="chunk_count is required"):
         repository.update_status(document.id, "indexed")
+
+
+def test_delete_owned_document_removes_record(db, test_user):
+    repository = DocumentRepository(db)
+    document = create_document(repository, test_user.id)
+
+    deleted = repository.delete_owned_document(document.id, test_user.id)
+
+    assert deleted is True
+    assert repository.get_owned_document(document.id, test_user.id) is None
+
+
+def test_delete_owned_document_does_not_remove_another_users_record(
+    db,
+    test_user,
+):
+    repository = DocumentRepository(db)
+    document = create_document(repository, test_user.id)
+
+    deleted = repository.delete_owned_document(document.id, test_user.id + 1)
+
+    assert deleted is False
+    assert repository.get_owned_document(document.id, test_user.id) is not None

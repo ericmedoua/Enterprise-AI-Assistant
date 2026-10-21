@@ -3,8 +3,27 @@ import pytest
 from app.repositories.evaluation_repository import (
     EvaluationRepository,
 )
+from types import SimpleNamespace
+
+from app.auth.authorization import require_admin
+from app.main import app
 
 pytestmark = pytest.mark.integration
+
+
+@pytest.fixture(autouse=True)
+def authorize_evaluation_integration_tests():
+    """Allow integration tests to exercise evaluation endpoints as admin."""
+    previous_override = app.dependency_overrides.get(require_admin)
+
+    app.dependency_overrides[require_admin] = lambda: SimpleNamespace(role="admin")
+
+    yield
+
+    if previous_override is None:
+        app.dependency_overrides.pop(require_admin, None)
+    else:
+        app.dependency_overrides[require_admin] = previous_override
 
 
 def test_evaluation_history_api_uses_database_and_pagination(

@@ -17,7 +17,26 @@ from app.ai.evaluation.evaluation_history import (
     build_evaluation_history,
 )
 
+from types import SimpleNamespace
+
+from app.auth.authorization import require_admin
+
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def authorize_evaluation_api_tests():
+    """Allow evaluation API tests to exercise endpoint behavior as an admin."""
+    previous_override = app.dependency_overrides.get(require_admin)
+
+    app.dependency_overrides[require_admin] = lambda: SimpleNamespace(role="admin")
+
+    yield
+
+    if previous_override is None:
+        app.dependency_overrides.pop(require_admin, None)
+    else:
+        app.dependency_overrides[require_admin] = previous_override
 
 
 def make_evaluation_run(

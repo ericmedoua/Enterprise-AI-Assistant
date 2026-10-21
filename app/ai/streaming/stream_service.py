@@ -1,18 +1,23 @@
 from collections.abc import AsyncGenerator
 
-from langchain_core.messages import HumanMessage
+from app.ai.chains.rag_chain import build_rag_chain
 
 
 class StreamingService:
-    def __init__(self, llm):
+    """Stream RAG answers using a caller-scoped retriever.
 
+    The retriever must be created by the authenticated request dependency. Do
+    not create an unscoped vector-store retriever inside this service.
+    """
+
+    def __init__(self, llm, retriever):
         self.llm = llm
+        self.retriever = retriever
+        self.chain = build_rag_chain(retriever=retriever, llm=llm)
 
-    async def stream(
-        self,
-        prompt: str,
-    ) -> AsyncGenerator[str, None]:
-
-        async for chunk in self.llm.astream([HumanMessage(content=prompt)]):
-            if chunk.content:
-                yield chunk.content
+    async def stream(self, prompt: str) -> AsyncGenerator[str, None]:
+        async for chunk in self.chain.astream(
+            {"question": prompt, "history": [], "summary": ""}
+        ):
+            if chunk:
+                yield chunk

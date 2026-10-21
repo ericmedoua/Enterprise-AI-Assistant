@@ -1,7 +1,6 @@
 from pathlib import Path
 
-from fastapi import HTTPException
-from fastapi import UploadFile
+from fastapi import HTTPException, UploadFile
 
 from app.core.upload_constants import (
     ALLOWED_CONTENT_TYPES,
@@ -11,31 +10,27 @@ from app.core.upload_constants import (
 
 
 class FileValidator:
-    async def validate(
-        self,
-        file: UploadFile,
-    ):
-
-        extension = Path(file.filename).suffix.lower()
-
+    async def validate(self, file: UploadFile) -> None:
+        filename = file.filename or ""
+        extension = Path(filename).suffix.lower()
         if extension not in ALLOWED_EXTENSIONS:
-            raise HTTPException(
-                status_code=400,
-                detail="Only PDF files are allowed.",
-            )
+            raise HTTPException(status_code=400, detail="Only PDF files are allowed.")
 
         if file.content_type not in ALLOWED_CONTENT_TYPES:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid content type.",
-            )
+            raise HTTPException(status_code=400, detail="Invalid content type.")
 
-        contents = await file.read()
-
-        if len(contents) > MAX_UPLOAD_SIZE:
-            raise HTTPException(
-                status_code=413,
-                detail="File exceeds maximum size.",
-            )
-
+        # Check size without loading the entire file into memory. UploadFile uses
+        # a seekable spooled file, so seeking to the end is inexpensive.
+        await file.seek(0, 2)
+        size = file.file.tell()
         await file.seek(0)
+        if size > MAX_UPLOAD_SIZE:
+            raise HTTPException(status_code=413, detail="File exceeds maximum size.")
+
+        # MIME type and extension can be forged; require a PDF signature.
+        header = await file.read(5)
+        await file.seek(0)
+        if header != b"%PDF-":
+            raise HTTPException(
+                status_code=400, detail="File content is not a valid PDF."
+            )

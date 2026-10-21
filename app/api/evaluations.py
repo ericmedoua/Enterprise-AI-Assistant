@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
+
+from app.auth.authorization import require_admin
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
@@ -138,6 +140,7 @@ from app.repositories.dependencies import (
 router = APIRouter(
     prefix="/evaluations",
     tags=["Evaluations"],
+    dependencies=[Depends(require_admin)],
 )
 
 

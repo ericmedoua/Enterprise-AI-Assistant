@@ -4,9 +4,10 @@ from pydantic import BaseModel
 
 from fastapi.responses import StreamingResponse
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException
 
 from app.auth.dependencies import get_current_user
+from app.auth.chat_access import get_owned_chat_session
 
 from app.models.user import User
 
@@ -52,7 +53,6 @@ class ChatResponse(BaseModel):
     answer: str
 
 
-
 @lru_cache
 def get_chatbot_service():
     return ChatbotService()
@@ -64,12 +64,12 @@ def get_chatbot_service():
 )
 def ask(
     request: ChatRequest,
+    current_user: User = Depends(get_current_user),
     service: ChatbotService = Depends(get_chatbot_service),
 ):
     answer = service.ask(request.question)
 
     return ChatResponse(answer=answer)
-
 
 
 from app.ai.streaming.dependencies import (
@@ -84,6 +84,7 @@ from app.ai.streaming.stream_service import (
 @router.post("/stream")
 async def stream_chat(
     question: str,
+    current_user: User = Depends(get_current_user),
     streaming: StreamingService = Depends(get_streaming_service),
 ):
 
@@ -120,31 +121,30 @@ def list_sessions(
 @router.get("/sessions/{session_id}")
 def get_session(
     session_id: int,
+    current_user: User = Depends(get_current_user),
     repository: ChatRepository = Depends(get_chat_repository),
 ):
-
-    return repository.get_session(session_id)
+    return get_owned_chat_session(session_id, current_user, repository)
 
 
 @router.put("/sessions/{session_id}")
 def rename_session(
     session_id: int,
     request: ChatSessionRename,
+    current_user: User = Depends(get_current_user),
     repository: ChatRepository = Depends(get_chat_repository),
 ):
-
-    return repository.rename_session(
-        session_id,
-        request.title,
-    )
+    get_owned_chat_session(session_id, current_user, repository)
+    return repository.rename_session(session_id, request.title)
 
 
 @router.delete("/sessions/{session_id}")
 def delete_session(
     session_id: int,
+    current_user: User = Depends(get_current_user),
     repository: ChatRepository = Depends(get_chat_repository),
 ):
-
+    get_owned_chat_session(session_id, current_user, repository)
     repository.delete_session(session_id)
 
     return {"message": "Session deleted"}
@@ -154,8 +154,11 @@ def delete_session(
 async def chat(
     session_id: int,
     request: ChatQuestion,
+    current_user: User = Depends(get_current_user),
+    repository: ChatRepository = Depends(get_chat_repository),
     service: ConversationService = Depends(get_conversation_service),
 ):
+    get_owned_chat_session(session_id, current_user, repository)
 
     generator = service.ask(
         session_id,

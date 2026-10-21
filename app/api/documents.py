@@ -4,7 +4,10 @@ from pathlib import Path
 from fastapi import APIRouter
 from fastapi import BackgroundTasks
 from fastapi import HTTPException
-from fastapi import UploadFile
+from fastapi import UploadFile, Depends
+
+from app.auth.dependencies import get_current_user
+from app.models.user import User
 
 from app.ai.retrieval.dependencies import get_chroma_service
 from app.documents.services.indexing_service import IndexingService
@@ -28,6 +31,7 @@ def _index_document_to_chroma(file_path: str):
 async def upload_document(
     background_tasks: BackgroundTasks,
     file: UploadFile,
+    current_user: User = Depends(get_current_user),
 ):
 
     UPLOAD_DIRECTORY.mkdir(exist_ok=True)

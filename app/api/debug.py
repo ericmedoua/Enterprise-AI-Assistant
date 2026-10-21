@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends
 
+from app.auth.authorization import require_admin
+
 from app.schemas.debug import RetrievalDebugResponse
 from app.services.retrieval_debug_service import RetrievalDebugService
 from functools import lru_cache
@@ -20,6 +22,7 @@ router = APIRouter()
 )
 def debug_retrieval(
     query: str,
+    admin=Depends(require_admin),
     service: RetrievalDebugService = Depends(get_retrieval_debug_service),
 ):
     return service.search(query)

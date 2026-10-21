@@ -10,6 +10,7 @@ from app.repositories.chat_repository import (
 from app.repositories.evaluation_repository import (
     EvaluationRepository,
 )
+from app.repositories.document_repository import DocumentRepository
 
 
 def get_chat_repository(
@@ -24,3 +25,9 @@ def get_evaluation_repository(
 ):
 
     return EvaluationRepository(db)
+
+
+def get_document_repository(
+    db: Session = Depends(get_db),
+):
+    return DocumentRepository(db)

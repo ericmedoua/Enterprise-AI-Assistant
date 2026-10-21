@@ -24,6 +24,12 @@ def test_same_filename_uploads_get_unique_paths_and_owner_metadata(
         accept_file,
     )
 
+    monkeypatch.setattr(
+        documents,
+        "DocumentRepository",
+        MagicMock(),
+    )
+
     user_a = SimpleNamespace(id=101)
     user_b = SimpleNamespace(id=202)
 
@@ -38,6 +44,7 @@ def test_same_filename_uploads_get_unique_paths_and_owner_metadata(
             background_tasks=background_tasks,
             file=file,
             current_user=user,
+            db=MagicMock(),
         )
 
         return result, background_tasks

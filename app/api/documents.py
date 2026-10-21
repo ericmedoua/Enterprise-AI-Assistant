@@ -1,17 +1,12 @@
 import shutil
 from pathlib import Path
+from uuid import uuid4
 
-from fastapi import APIRouter
-from fastapi import BackgroundTasks
-from fastapi import HTTPException
-from fastapi import UploadFile, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, UploadFile
 
 from app.auth.dependencies import get_current_user
 from app.models.user import User
-
-from app.ai.retrieval.dependencies import get_chroma_service
 from app.documents.services.indexing_service import IndexingService
-
 from app.documents.services.file_validator import FileValidator
 from app.documents.services.file_utils import sanitize_filename
 
@@ -23,8 +18,20 @@ router = APIRouter(
 UPLOAD_DIRECTORY = Path("storage")
 
 
-def _index_document_to_chroma(file_path: str):
-    IndexingService().index_document(file_path)
+def _index_document_to_chroma(
+    file_path: str,
+    *,
+    owner_id: str | int,
+    document_id: str,
+    source_name: str,
+) -> int:
+    """Index a document with ownership and source metadata."""
+    return IndexingService().index_document(
+        file_path,
+        owner_id=owner_id,
+        document_id=document_id,
+        source_name=source_name,
+    )
 
 
 @router.post("/upload")
@@ -33,25 +40,32 @@ async def upload_document(
     file: UploadFile,
     current_user: User = Depends(get_current_user),
 ):
-
-    UPLOAD_DIRECTORY.mkdir(exist_ok=True)
+    UPLOAD_DIRECTORY.mkdir(parents=True, exist_ok=True)
 
     await FileValidator().validate(file)
 
-    filename = sanitize_filename(file.filename)
+    filename = sanitize_filename(file.filename or "upload")
+    document_id = str(uuid4())
+    stored_filename = f"{document_id}_{filename}"
+    file_path = UPLOAD_DIRECTORY / stored_filename
 
-    file_path = UPLOAD_DIRECTORY / filename
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except OSError:
+        raise
 
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    background_tasks.add_task(
+        _index_document_to_chroma,
+        str(file_path),
+        owner_id=current_user.id,
+        document_id=document_id,
+        source_name=filename,
+    )
 
-        background_tasks.add_task(
-            _index_document_to_chroma,
-            str(file_path),
-        )
-
-        return {
-            "message": "Document uploaded successfully.",
-            "status": "indexing",
-            "filename": filename,
-        }
+    return {
+        "message": "Document uploaded successfully.",
+        "status": "indexing",
+        "filename": filename,
+        "document_id": document_id,
+    }

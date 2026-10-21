@@ -38,6 +38,14 @@ from app.services.conversation_service import (
 from app.ai.chat.chatbot_service import (
     ChatbotService,
 )
+from app.ai.streaming.dependencies import (
+    get_streaming_service,
+)
+
+from app.ai.streaming.stream_service import (
+    StreamingService,
+)
+from app.ai.retrieval.dependencies import get_user_retriever
 
 router = APIRouter(
     prefix="/chat",
@@ -53,9 +61,10 @@ class ChatResponse(BaseModel):
     answer: str
 
 
-@lru_cache
-def get_chatbot_service():
-    return ChatbotService()
+def get_chatbot_service(
+    retriever=Depends(get_user_retriever),
+) -> ChatbotService:
+    return ChatbotService(retriever=retriever)
 
 
 @router.post(
@@ -70,15 +79,6 @@ def ask(
     answer = service.ask(request.question)
 
     return ChatResponse(answer=answer)
-
-
-from app.ai.streaming.dependencies import (
-    get_streaming_service,
-)
-
-from app.ai.streaming.stream_service import (
-    StreamingService,
-)
 
 
 @router.post("/stream")

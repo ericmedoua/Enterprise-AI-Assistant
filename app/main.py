@@ -66,16 +66,50 @@ app.add_middleware(
 async def startup():
     app_logger.info("Application Started")
 
-    if settings.evaluation_scheduler_enabled:
-        asyncio.create_task(
-            run_remediation_scheduler(
-                interval_seconds=(settings.evaluation_scheduler_interval_seconds)
-            )
-        )
+    scheduler_tasks = []
 
+    if settings.evaluation_scheduler_enabled:
+        task = asyncio.create_task(
+            run_remediation_scheduler(
+                interval_seconds=settings.evaluation_scheduler_interval_seconds
+            ),
+            name="evaluation-remediation-scheduler",
+        )
+        scheduler_tasks.append(task)
         app_logger.info("Evaluation remediation scheduler enabled.")
     else:
         app_logger.info("Evaluation remediation scheduler disabled.")
+
+    if settings.document_deletion_recovery_enabled:
+        from app.documents.services.deletion_recovery_scheduler import (
+            run_document_deletion_recovery_scheduler,
+        )
+
+        task = asyncio.create_task(
+            run_document_deletion_recovery_scheduler(
+                interval_seconds=(settings.document_deletion_recovery_interval_seconds)
+            ),
+            name="document-deletion-recovery-scheduler",
+        )
+        scheduler_tasks.append(task)
+        app_logger.info("Document deletion recovery scheduler enabled.")
+    else:
+        app_logger.info("Document deletion recovery scheduler disabled.")
+
+    app.state.scheduler_tasks = scheduler_tasks
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    scheduler_tasks = getattr(app.state, "scheduler_tasks", [])
+
+    for task in scheduler_tasks:
+        task.cancel()
+
+    if scheduler_tasks:
+        await asyncio.gather(*scheduler_tasks, return_exceptions=True)
+
+    app_logger.info("Background scheduler tasks stopped.")
 
 
 @app.get("/")

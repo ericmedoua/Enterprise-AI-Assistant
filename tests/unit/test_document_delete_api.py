@@ -175,3 +175,43 @@ def test_delete_document_returns_500_if_registry_delete_fails(
     assert not file_path.exists()
     repository.begin_deletion.assert_called_once_with("doc-1", user.id)
     chroma_service.delete_document.assert_called_once()
+
+
+def test_delete_document_can_be_retried_after_chroma_failure(
+    document_delete_client,
+):
+    client, user, repository, chroma_service, storage = document_delete_client
+    document = make_document()
+    file_path = storage / document.stored_filename
+    file_path.write_text("test document", encoding="utf-8")
+
+    repository.get_owned_document.return_value = document
+    repository.begin_deletion.return_value = document
+    repository.delete_owned_document.return_value = True
+
+    # The first request fails during vector cleanup.
+    # The second request retries the same cleanup successfully.
+    chroma_service.delete_document.side_effect = [
+        RuntimeError("Chroma temporarily unavailable"),
+        None,
+    ]
+
+    first_response = client.delete("/api/v1/documents/doc-1")
+
+    assert first_response.status_code == 500
+    assert file_path.exists()
+    repository.delete_owned_document.assert_not_called()
+
+    # Retry the deletion.
+    second_response = client.delete("/api/v1/documents/doc-1")
+
+    assert second_response.status_code == 200
+    assert second_response.json()["document_id"] == "doc-1"
+    assert not file_path.exists()
+
+    assert chroma_service.delete_document.call_count == 2
+    assert repository.begin_deletion.call_count == 2
+    repository.delete_owned_document.assert_called_once_with(
+        "doc-1",
+        user.id,
+    )

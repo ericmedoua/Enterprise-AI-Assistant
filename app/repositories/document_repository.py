@@ -181,3 +181,16 @@ class DocumentRepository:
             raise
 
         return True
+
+    def list_pending_deletions(self, limit: int = 100) -> list[Document]:
+        """Return documents whose deletion needs to be retried."""
+        if limit < 1:
+            raise ValueError("limit must be greater than or equal to 1.")
+
+        return (
+            self.db.query(Document)
+            .filter(Document.status == "deleting")
+            .order_by(Document.created_at.asc(), Document.id.asc())
+            .limit(limit)
+            .all()
+        )

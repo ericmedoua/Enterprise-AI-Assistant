@@ -186,3 +186,67 @@ def test_failed_document_can_enter_deleting_state(db, test_user):
     assert deleting is not None
     assert deleting.status == "deleting"
     assert deleting.error_message == "Indexing failed."
+
+
+def test_list_pending_deletions_only_returns_deleting_documents(db, test_user):
+    repository = DocumentRepository(db)
+
+    pending = create_document(repository, test_user.id, "pending.pdf")
+    indexed = create_document(repository, test_user.id, "indexed.pdf")
+    failed = create_document(repository, test_user.id, "failed.pdf")
+
+    repository.update_status(pending.id, "failed")
+    repository.begin_deletion(pending.id, test_user.id)
+
+    repository.update_status(indexed.id, "indexed", chunk_count=3)
+
+    repository.update_status(
+        failed.id,
+        "failed",
+        error_message="Indexing failed.",
+    )
+
+    documents = repository.list_pending_deletions()
+
+    assert pending.id in {document.id for document in documents}
+    assert all(document.status == "deleting" for document in documents)
+    assert documents[0].status == "deleting"
+
+
+def test_list_pending_deletions_respects_limit(db, test_user):
+    repository = DocumentRepository(db)
+    created_documents = [
+        create_document(repository, test_user.id, f"pending-{index}.pdf")
+        for index in range(3)
+    ]
+
+    for document in created_documents:
+        repository.update_status(document.id, "failed")
+        repository.begin_deletion(document.id, test_user.id)
+
+    documents = repository.list_pending_deletions(limit=2)
+
+    assert len(documents) == 2
+    assert all(document.status == "deleting" for document in documents)
+
+
+def test_list_pending_deletions_rejects_nonpositive_limit(db):
+    repository = DocumentRepository(db)
+
+    for invalid_limit in (0, -1):
+        with pytest.raises(
+            ValueError, match="limit must be greater than or equal to 1"
+        ):
+            repository.list_pending_deletions(limit=invalid_limit)
+
+
+def test_list_pending_deletions_returns_empty_list_when_none_pending(
+    db,
+    test_user,
+):
+    repository = DocumentRepository(db)
+    document = create_document(repository, test_user.id)
+
+    documents = repository.list_pending_deletions()
+
+    assert document.id not in {item.id for item in documents}

@@ -1,6 +1,7 @@
 from unittest.mock import Mock, patch
 
 import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
 
 
 @pytest.mark.asyncio
@@ -12,7 +13,11 @@ async def test_startup_enables_scheduler(
 ):
     from app.main import startup
 
-    mock_create_task.side_effect = lambda coroutine: coroutine.close()
+    def close_coroutine(coroutine, **kwargs):
+        coroutine.close()
+        return MagicMock()
+
+    mock_create_task.side_effect = close_coroutine
 
     with (
         patch(

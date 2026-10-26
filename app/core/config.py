@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     evaluation_scheduler_enabled: bool = False
     evaluation_scheduler_interval_seconds: int = 300
 
+    document_deletion_recovery_enabled: bool = False
+    document_deletion_recovery_interval_seconds: int = Field(
+        default=300,
+        gt=0,
+    )
+
     @property
     def CHROMA_PATH(self) -> str:
         """Alias for backwards compatibility with uppercase access."""

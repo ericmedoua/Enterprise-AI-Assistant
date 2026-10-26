@@ -1,7 +1,15 @@
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.base import Base
@@ -12,7 +20,7 @@ class Document(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "status IN ('indexing', 'indexed', 'failed')",
+            "status IN ('indexing', 'indexed', 'failed', 'deleting')",
             name="ck_documents_status",
         ),
         CheckConstraint(

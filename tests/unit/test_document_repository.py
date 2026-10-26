@@ -123,3 +123,66 @@ def test_delete_owned_document_does_not_remove_another_users_record(
 
     assert deleted is False
     assert repository.get_owned_document(document.id, test_user.id) is not None
+
+
+def test_begin_deletion_marks_indexed_document_as_deleting(db, test_user):
+    repository = DocumentRepository(db)
+    document = create_document(repository, test_user.id)
+
+    repository.update_status(document.id, "indexed", chunk_count=7)
+
+    deleting = repository.begin_deletion(document.id, test_user.id)
+
+    assert deleting is not None
+    assert deleting.status == "deleting"
+    assert deleting.chunk_count == 7
+
+
+def test_begin_deletion_allows_retry(db, test_user):
+    repository = DocumentRepository(db)
+    document = create_document(repository, test_user.id)
+
+    repository.update_status(document.id, "indexed", chunk_count=3)
+    repository.begin_deletion(document.id, test_user.id)
+
+    retry = repository.begin_deletion(document.id, test_user.id)
+
+    assert retry is not None
+    assert retry.status == "deleting"
+
+
+def test_begin_deletion_rejects_indexing_document(db, test_user):
+    repository = DocumentRepository(db)
+    document = create_document(repository, test_user.id)
+
+    with pytest.raises(ValueError, match="while it is indexing"):
+        repository.begin_deletion(document.id, test_user.id)
+
+    assert repository.get_owned_document(document.id, test_user.id).status == "indexing"
+
+
+def test_begin_deletion_does_not_change_another_users_document(db, test_user):
+    repository = DocumentRepository(db)
+    document = create_document(repository, test_user.id)
+
+    result = repository.begin_deletion(document.id, test_user.id + 1)
+
+    assert result is None
+    assert repository.get_owned_document(document.id, test_user.id).status == "indexing"
+
+
+def test_failed_document_can_enter_deleting_state(db, test_user):
+    repository = DocumentRepository(db)
+    document = create_document(repository, test_user.id)
+
+    repository.update_status(
+        document.id,
+        "failed",
+        error_message="Indexing failed.",
+    )
+
+    deleting = repository.begin_deletion(document.id, test_user.id)
+
+    assert deleting is not None
+    assert deleting.status == "deleting"
+    assert deleting.error_message == "Indexing failed."

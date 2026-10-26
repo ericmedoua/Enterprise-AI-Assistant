@@ -3,12 +3,13 @@ from sqlalchemy.orm import Session
 from app.models.document import Document
 
 
-DOCUMENT_STATUSES = {"indexing", "indexed", "failed"}
+DOCUMENT_STATUSES = {"indexing", "indexed", "failed", "deleting"}
 
 ALLOWED_STATUS_TRANSITIONS = {
     "indexing": {"indexed", "failed"},
-    "indexed": set(),
-    "failed": set(),
+    "indexed": {"deleting"},
+    "failed": {"deleting"},
+    "deleting": set(),
 }
 
 
@@ -89,7 +90,6 @@ class DocumentRepository:
 
         if status != document.status:
             allowed = ALLOWED_STATUS_TRANSITIONS[document.status]
-
             if status not in allowed:
                 raise ValueError(
                     f"Invalid document status transition: {document.status} -> {status}"
@@ -107,6 +107,7 @@ class DocumentRepository:
             document.error_message = None
         elif status == "failed":
             document.error_message = error_message or "Document indexing failed."
+
             document.chunk_count = 0
 
         try:
@@ -117,6 +118,49 @@ class DocumentRepository:
             raise
 
         return document
+
+    def begin_deletion(
+        self,
+        document_id: str,
+        owner_id: int,
+    ) -> Document | None:
+        """Mark an owned document as deleting before external cleanup.
+
+        Repeated calls for a document already being deleted are allowed,
+        so a failed cleanup can be retried.
+        """
+        try:
+            document = (
+                self.db.query(Document)
+                .filter(
+                    Document.id == document_id,
+                    Document.owner_id == owner_id,
+                )
+                .with_for_update()
+                .first()
+            )
+
+            if document is None:
+                self.db.rollback()
+                return None
+
+            if document.status == "indexing":
+                raise ValueError("Cannot delete a document while it is indexing.")
+
+            if document.status not in {"indexed", "failed", "deleting"}:
+                raise ValueError(f"Cannot delete document in status: {document.status}")
+
+            if document.status != "deleting":
+                document.status = "deleting"
+
+            # Commit even on a retry to release the row lock.
+            self.db.commit()
+            self.db.refresh(document)
+            return document
+
+        except Exception:
+            self.db.rollback()
+            raise
 
     def delete_owned_document(
         self,

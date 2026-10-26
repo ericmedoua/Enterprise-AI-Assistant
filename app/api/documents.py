@@ -157,14 +157,14 @@ def delete_document(
             detail="Document not found.",
         )
 
-    # Avoid racing with the background indexing worker.
+    # Do not race with the background indexing worker.
     if document.status == "indexing":
         raise HTTPException(
             status_code=409,
             detail="Document is still indexing. Try again later.",
         )
 
-    # Resolve and validate the storage path before touching any data.
+    # Resolve and validate the storage path before changing state or data.
     storage_root = UPLOAD_DIRECTORY.resolve()
     file_path = (storage_root / document.stored_filename).resolve()
 
@@ -178,7 +178,38 @@ def delete_document(
             detail="Document storage path is invalid.",
         )
 
-    # Each operation must succeed before proceeding to the next.
+    # Persist deletion intent before touching vectors or the stored file.
+    try:
+        deleting_document = repository.begin_deletion(
+            document_id,
+            current_user.id,
+        )
+    except ValueError as exc:
+        logger.warning(
+            "Document cannot enter deletion state: document_id=%s",
+            document_id,
+        )
+        raise HTTPException(
+            status_code=409,
+            detail="Document cannot be deleted in its current state.",
+        ) from exc
+    except Exception as exc:
+        logger.exception(
+            "Could not mark document for deletion: document_id=%s",
+            document_id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Could not start document deletion.",
+        ) from exc
+
+    if deleting_document is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found.",
+        )
+
+    # Retry-safe cleanup: repeated deletion of vectors and missing files is safe.
     try:
         chroma_service.delete_document(
             owner_id=current_user.id,
@@ -191,7 +222,7 @@ def delete_document(
         )
         raise HTTPException(
             status_code=500,
-            detail="Could not delete document vectors.",
+            detail="Could not delete document vectors. Retry deletion later.",
         ) from exc
 
     try:
@@ -203,7 +234,7 @@ def delete_document(
         )
         raise HTTPException(
             status_code=500,
-            detail="Could not delete stored document file.",
+            detail="Could not delete stored document file. Retry deletion later.",
         ) from exc
 
     try:
@@ -225,7 +256,7 @@ def delete_document(
         )
         raise HTTPException(
             status_code=500,
-            detail="Could not delete document record.",
+            detail="Could not delete document record. Retry deletion later.",
         ) from exc
 
     return {

@@ -162,6 +162,27 @@ class DocumentRepository:
             self.db.rollback()
             raise
 
+    def claim_pending_deletion(
+        self,
+        document_id: str,
+        owner_id: int | None = None,
+    ) -> Document | None:
+        """Lock a pending deletion so only one worker cleans it up at a time."""
+        try:
+            query = self.db.query(Document).filter(
+                Document.id == document_id,
+                Document.status == "deleting",
+            )
+
+            if owner_id is not None:
+                query = query.filter(Document.owner_id == owner_id)
+
+            return query.with_for_update(skip_locked=True).first()
+
+        except Exception:
+            self.db.rollback()
+            raise
+
     def delete_owned_document(
         self,
         document_id: str,

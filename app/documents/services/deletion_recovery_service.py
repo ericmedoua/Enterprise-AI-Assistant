@@ -29,9 +29,10 @@ class DocumentDeletionRecoveryService:
 
     def recover_pending_deletions(self) -> int:
         """Clean up pending documents and return the number completed."""
+        # Read candidate IDs only. This query does not claim the documents.
         with self.session_factory() as db:
-            pending = [
-                (document.id, document.owner_id, document.stored_filename)
+            pending_ids = [
+                document.id
                 for document in DocumentRepository(db).list_pending_deletions(
                     limit=self.batch_size
                 )
@@ -39,29 +40,42 @@ class DocumentDeletionRecoveryService:
 
         completed = 0
 
-        for document_id, owner_id, stored_filename in pending:
+        for document_id in pending_ids:
             try:
-                storage_root = self.upload_directory.resolve()
-                file_path = (storage_root / stored_filename).resolve()
-
-                # Stored documents must be direct children of the storage root.
-                if (
-                    file_path.parent != storage_root
-                    or file_path.name != stored_filename
-                ):
-                    raise ValueError(f"Unsafe storage path for document {document_id}")
-
-                # Use the recorded owner, not the current request's identity.
-                self.chroma_service_factory().delete_document(
-                    owner_id=owner_id,
-                    document_id=document_id,
-                )
-
-                # Missing files are safe: a previous attempt may have removed them.
-                file_path.unlink(missing_ok=True)
-
+                # Claim one document and keep this session open throughout cleanup.
                 with self.session_factory() as db:
-                    deleted = DocumentRepository(db).delete_owned_document(
+                    repository = DocumentRepository(db)
+                    document = repository.claim_pending_deletion(document_id)
+
+                    # Another worker may hold the lock, or the record may be gone.
+                    if document is None:
+                        continue
+
+                    owner_id = document.owner_id
+                    stored_filename = document.stored_filename
+
+                    storage_root = self.upload_directory.resolve()
+                    file_path = (storage_root / stored_filename).resolve()
+
+                    # Stored documents must be direct children of the storage root.
+                    if (
+                        file_path.parent != storage_root
+                        or file_path.name != stored_filename
+                    ):
+                        raise ValueError(
+                            f"Unsafe storage path for document {document_id}"
+                        )
+
+                    # Use the recorded owner, not the current request's identity.
+                    self.chroma_service_factory().delete_document(
+                        owner_id=owner_id,
+                        document_id=document_id,
+                    )
+
+                    # Missing files are safe: a previous attempt may have removed them.
+                    file_path.unlink(missing_ok=True)
+
+                    deleted = repository.delete_owned_document(
                         document_id,
                         owner_id,
                     )
@@ -70,13 +84,14 @@ class DocumentDeletionRecoveryService:
                         completed += 1
                     else:
                         logger.info(
-                            "Document record was already removed during recovery: document_id=%s",
+                            "Document record was already removed during recovery: "
+                            "document_id=%s",
                             document_id,
                         )
-                        completed += 1
 
             except Exception:
-                # One failure must not prevent recovery of other documents.
+                # Closing the session releases its lock; the committed deleting
+                # status remains available for another recovery attempt.
                 logger.exception(
                     "Document deletion recovery failed: document_id=%s",
                     document_id,

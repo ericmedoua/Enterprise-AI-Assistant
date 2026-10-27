@@ -57,6 +57,7 @@ def test_recovery_removes_vectors_file_and_record(
         stored_filename="doc-1_report.pdf",
     )
     repository.list_pending_deletions.return_value = [document]
+    repository.claim_pending_deletion.return_value = document
     monkeypatch.setattr(
         "app.documents.services.deletion_recovery_service.DocumentRepository",
         lambda db: repository,
@@ -87,6 +88,7 @@ def test_recovery_keeps_record_when_chroma_fails(
         stored_filename="doc-2_report.pdf",
     )
     repository.list_pending_deletions.return_value = [document]
+    repository.claim_pending_deletion.return_value = document
     repository_class = lambda db: repository
     monkeypatch.setattr(
         "app.documents.services.deletion_recovery_service.DocumentRepository",
@@ -119,6 +121,7 @@ def test_recovery_continues_after_one_document_fails(
         stored_filename="doc-good.pdf",
     )
     repository.list_pending_deletions.return_value = [first, second]
+    repository.claim_pending_deletion.side_effect = [first, second]
     monkeypatch.setattr(
         "app.documents.services.deletion_recovery_service.DocumentRepository",
         lambda db: repository,
@@ -140,3 +143,34 @@ def test_recovery_continues_after_one_document_fails(
 def test_recovery_rejects_invalid_batch_size():
     with pytest.raises(ValueError, match="batch_size"):
         DocumentDeletionRecoveryService(batch_size=0)
+
+
+def test_recovery_skips_document_claimed_by_another_worker(
+    recovery_setup,
+    monkeypatch,
+):
+    service, _, repository, chroma, storage = recovery_setup
+    document = SimpleNamespace(
+        id="doc-locked",
+        owner_id=101,
+        stored_filename="doc-locked_report.pdf",
+    )
+    repository.list_pending_deletions.return_value = [document]
+
+    # None represents a missing document or a row locked by another worker.
+    repository.claim_pending_deletion.return_value = None
+
+    monkeypatch.setattr(
+        "app.documents.services.deletion_recovery_service.DocumentRepository",
+        lambda db: repository,
+    )
+
+    file_path = storage / document.stored_filename
+    file_path.write_text("test document", encoding="utf-8")
+
+    assert service.recover_pending_deletions() == 0
+
+    repository.claim_pending_deletion.assert_called_once_with("doc-locked")
+    chroma.delete_document.assert_not_called()
+    repository.delete_owned_document.assert_not_called()
+    assert file_path.exists()

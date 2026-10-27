@@ -206,7 +206,7 @@ def test_list_pending_deletions_only_returns_deleting_documents(db, test_user):
         error_message="Indexing failed.",
     )
 
-    documents = repository.list_pending_deletions()
+    documents = repository.list_pending_deletions(limit=10000)
 
     assert pending.id in {document.id for document in documents}
     assert all(document.status == "deleting" for document in documents)

@@ -51,6 +51,7 @@ def test_delete_document_removes_vectors_file_and_record(document_delete_client)
     file_path.write_text("test document", encoding="utf-8")
     repository.get_owned_document.return_value = document
     repository.begin_deletion.return_value = document
+    repository.claim_pending_deletion.return_value = document
     repository.delete_owned_document.return_value = True
 
     response = client.delete("/api/v1/documents/doc-1")
@@ -63,6 +64,10 @@ def test_delete_document_removes_vectors_file_and_record(document_delete_client)
         document_id="doc-1",
     )
     repository.begin_deletion.assert_called_once_with("doc-1", user.id)
+    repository.claim_pending_deletion.assert_called_once_with(
+        "doc-1",
+        owner_id=user.id,
+    )
     repository.delete_owned_document.assert_called_once_with("doc-1", user.id)
 
 
@@ -114,6 +119,10 @@ def test_delete_document_keeps_file_and_record_if_chroma_fails(
     assert response.status_code == 500
     assert file_path.exists()
     repository.begin_deletion.assert_called_once_with("doc-1", user.id)
+    repository.claim_pending_deletion.assert_called_once_with(
+        "doc-1",
+        owner_id=user.id,
+    )
     repository.delete_owned_document.assert_not_called()
 
 
@@ -127,6 +136,7 @@ def test_delete_document_keeps_record_if_file_removal_fails(
     file_path.write_text("test document", encoding="utf-8")
     repository.get_owned_document.return_value = document
     repository.begin_deletion.return_value = document
+    repository.claim_pending_deletion.return_value = document
 
     def fail_unlink(*args, **kwargs):
         raise OSError("permission denied")
@@ -137,6 +147,10 @@ def test_delete_document_keeps_record_if_file_removal_fails(
 
     assert response.status_code == 500
     repository.begin_deletion.assert_called_once_with("doc-1", user.id)
+    repository.claim_pending_deletion.assert_called_once_with(
+        "doc-1",
+        owner_id=user.id,
+    )
     chroma_service.delete_document.assert_called_once()
     repository.delete_owned_document.assert_not_called()
 
@@ -167,6 +181,7 @@ def test_delete_document_returns_500_if_registry_delete_fails(
     file_path.write_text("test document", encoding="utf-8")
     repository.get_owned_document.return_value = document
     repository.begin_deletion.return_value = document
+    repository.claim_pending_deletion.return_value = document
     repository.delete_owned_document.side_effect = RuntimeError("database unavailable")
 
     response = client.delete("/api/v1/documents/doc-1")
@@ -174,6 +189,10 @@ def test_delete_document_returns_500_if_registry_delete_fails(
     assert response.status_code == 500
     assert not file_path.exists()
     repository.begin_deletion.assert_called_once_with("doc-1", user.id)
+    repository.claim_pending_deletion.assert_called_once_with(
+        "doc-1",
+        owner_id=user.id,
+    )
     chroma_service.delete_document.assert_called_once()
 
 
@@ -187,6 +206,7 @@ def test_delete_document_can_be_retried_after_chroma_failure(
 
     repository.get_owned_document.return_value = document
     repository.begin_deletion.return_value = document
+    repository.claim_pending_deletion.return_value = document
     repository.delete_owned_document.return_value = True
 
     # The first request fails during vector cleanup.
@@ -211,7 +231,29 @@ def test_delete_document_can_be_retried_after_chroma_failure(
 
     assert chroma_service.delete_document.call_count == 2
     assert repository.begin_deletion.call_count == 2
+    assert repository.claim_pending_deletion.call_count == 2
+
     repository.delete_owned_document.assert_called_once_with(
         "doc-1",
         user.id,
     )
+
+
+def test_delete_document_skips_cleanup_if_another_worker_claimed_it(
+    document_delete_client,
+):
+    client, user, repository, chroma_service, storage = document_delete_client
+    document = make_document()
+    file_path = storage / document.stored_filename
+    file_path.write_text("test document", encoding="utf-8")
+
+    repository.get_owned_document.return_value = document
+    repository.begin_deletion.return_value = document
+    repository.claim_pending_deletion.return_value = None
+
+    response = client.delete("/api/v1/documents/doc-1")
+
+    assert response.status_code == 409
+    assert file_path.exists()
+    chroma_service.delete_document.assert_not_called()
+    repository.delete_owned_document.assert_not_called()

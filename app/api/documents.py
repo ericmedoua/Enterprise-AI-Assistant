@@ -150,21 +150,18 @@ def delete_document(
         current_user.id,
     )
 
-    # Do not reveal whether another user's document exists.
     if document is None:
         raise HTTPException(
             status_code=404,
             detail="Document not found.",
         )
 
-    # Do not race with the background indexing worker.
     if document.status == "indexing":
         raise HTTPException(
             status_code=409,
             detail="Document is still indexing. Try again later.",
         )
 
-    # Resolve and validate the storage path before changing state or data.
     storage_root = UPLOAD_DIRECTORY.resolve()
     file_path = (storage_root / document.stored_filename).resolve()
 
@@ -178,7 +175,7 @@ def delete_document(
             detail="Document storage path is invalid.",
         )
 
-    # Persist deletion intent before touching vectors or the stored file.
+    # Persist deletion intent so a failed cleanup remains recoverable.
     try:
         deleting_document = repository.begin_deletion(
             document_id,
@@ -209,11 +206,33 @@ def delete_document(
             detail="Document not found.",
         )
 
-    # Retry-safe cleanup: repeated deletion of vectors and missing files is safe.
+    # Claim the committed deleting record. Keep this DB session open through
+    # cleanup so the recovery worker cannot claim the same row concurrently.
+    try:
+        claimed_document = repository.claim_pending_deletion(
+            document_id,
+            owner_id=current_user.id,
+        )
+    except Exception as exc:
+        logger.exception(
+            "Could not claim document deletion: document_id=%s",
+            document_id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Could not start document deletion.",
+        ) from exc
+
+    if claimed_document is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Document deletion is already in progress. Retry later.",
+        )
+
     try:
         chroma_service.delete_document(
             owner_id=current_user.id,
-            document_id=document.id,
+            document_id=claimed_document.id,
         )
     except Exception as exc:
         logger.exception(

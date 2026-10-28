@@ -118,3 +118,89 @@ def test_indexing_worker_logs_if_failed_status_cannot_be_saved(monkeypatch):
         "failed",
         error_message="Document indexing failed.",
     )
+
+
+def test_indexing_worker_cleans_up_vectors_if_indexed_status_fails(
+    monkeypatch,
+):
+    indexing_service, repository = configure_worker_mocks(
+        monkeypatch,
+        chunk_count=5,
+    )
+
+    repository.update_status.side_effect = [
+        RuntimeError("Database unavailable"),
+        None,
+    ]
+
+    chroma_service = MagicMock()
+    monkeypatch.setattr(
+        documents,
+        "get_chroma_service",
+        lambda: chroma_service,
+    )
+
+    result = documents._index_document_to_chroma(
+        "storage/example.pdf",
+        owner_id=101,
+        document_id="document-999",
+        source_name="example.pdf",
+    )
+
+    assert result is None
+
+    chroma_service.delete_document.assert_called_once_with(
+        owner_id=101,
+        document_id="document-999",
+    )
+
+    assert repository.update_status.call_count == 2
+    repository.update_status.assert_called_with(
+        "document-999",
+        "failed",
+        error_message="Document indexing failed.",
+    )
+
+
+def test_indexing_worker_persists_failed_status_if_vector_cleanup_fails(
+    monkeypatch,
+):
+    _, repository = configure_worker_mocks(
+        monkeypatch,
+        chunk_count=5,
+    )
+
+    repository.update_status.side_effect = [
+        RuntimeError("Database unavailable"),
+        None,
+    ]
+
+    chroma_service = MagicMock()
+    chroma_service.delete_document.side_effect = RuntimeError("Chroma unavailable")
+
+    monkeypatch.setattr(
+        documents,
+        "get_chroma_service",
+        lambda: chroma_service,
+    )
+
+    result = documents._index_document_to_chroma(
+        "storage/example.pdf",
+        owner_id=101,
+        document_id="document-1000",
+        source_name="example.pdf",
+    )
+
+    assert result is None
+
+    chroma_service.delete_document.assert_called_once_with(
+        owner_id=101,
+        document_id="document-1000",
+    )
+
+    assert repository.update_status.call_count == 2
+    repository.update_status.assert_called_with(
+        "document-1000",
+        "failed",
+        error_message="Document indexing failed.",
+    )

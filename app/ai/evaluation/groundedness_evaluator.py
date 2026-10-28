@@ -108,7 +108,9 @@ def _extract_answer_sentences(answer: str) -> list[str]:
         for part in parts:
             part = part.strip()
 
-            if part:
+            # Ignore Markdown-only fragments such as a leftover
+            # asterisk from a bold "Sources" heading.
+            if _content_tokens(part):
                 sentences.append(part)
 
     return sentences

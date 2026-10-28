@@ -66,10 +66,19 @@ def test_indexing_worker_persists_indexed_status_and_chunk_count(monkeypatch):
     )
 
 
-def test_indexing_worker_persists_failed_status_on_exception(monkeypatch):
+def test_indexing_worker_cleans_up_vectors_if_indexing_raises(
+    monkeypatch,
+):
     indexing_service, repository = configure_worker_mocks(
         monkeypatch,
-        index_error=RuntimeError("Sensitive internal error"),
+        index_error=RuntimeError("Chroma insertion failed"),
+    )
+
+    chroma_service = MagicMock()
+    monkeypatch.setattr(
+        documents,
+        "get_chroma_service",
+        lambda: chroma_service,
     )
 
     result = documents._index_document_to_chroma(
@@ -82,6 +91,10 @@ def test_indexing_worker_persists_failed_status_on_exception(monkeypatch):
     assert result is None
 
     indexing_service.index_document.assert_called_once()
+    chroma_service.delete_document.assert_called_once_with(
+        owner_id=101,
+        document_id="document-456",
+    )
 
     repository.update_status.assert_called_once_with(
         "document-456",

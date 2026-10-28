@@ -36,7 +36,6 @@ def _index_document_to_chroma(
     source_name: str,
 ) -> int | None:
     """Index a document and persist its final registry status."""
-    indexing_completed = False
 
     try:
         chunk_count = IndexingService().index_document(
@@ -45,7 +44,6 @@ def _index_document_to_chroma(
             document_id=document_id,
             source_name=source_name,
         )
-        indexing_completed = True
 
         with SessionLocal() as db:
             DocumentRepository(db).update_status(
@@ -62,33 +60,31 @@ def _index_document_to_chroma(
             document_id,
         )
 
-        if indexing_completed:
-            try:
-                get_chroma_service().delete_document(
-                    owner_id=owner_id,
-                    document_id=document_id,
-                )
-            except Exception:
-                logger.exception(
-                    "Could not clean up vectors after indexing status failure "
-                    "for document_id=%s",
-                    document_id,
-                )
+    try:
+        get_chroma_service().delete_document(
+            owner_id=owner_id,
+            document_id=document_id,
+        )
+    except Exception:
+        logger.exception(
+            "Could not clean up vectors after indexing failure for document_id=%s",
+            document_id,
+        )
 
-        try:
-            with SessionLocal() as db:
-                DocumentRepository(db).update_status(
-                    document_id,
-                    "failed",
-                    error_message="Document indexing failed.",
-                )
-        except Exception:
-            logger.exception(
-                "Could not persist failed status for document_id=%s",
+    try:
+        with SessionLocal() as db:
+            DocumentRepository(db).update_status(
                 document_id,
+                "failed",
+                error_message="Document indexing failed.",
             )
+    except Exception:
+        logger.exception(
+            "Could not persist failed status for document_id=%s",
+            document_id,
+        )
 
-        return None
+    return None
 
 
 @router.post("/upload")

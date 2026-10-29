@@ -78,17 +78,58 @@ def _index_document_to_chroma(
 
     try:
         with SessionLocal() as db:
-            DocumentRepository(db).update_status(
+            updated_document = DocumentRepository(db).update_status(
                 document_id,
                 "indexed",
                 chunk_count=chunk_count,
             )
+
+            if updated_document is None:
+                logger.warning(
+                    "Document no longer exists after indexing; cleaning up vectors: "
+                    "document_id=%s",
+                    document_id,
+                )
+                cleanup_vectors = True
+            else:
+                cleanup_vectors = False
+
+    except ValueError as exc:
+        if "Invalid document status transition: deleting -> indexed" in str(exc):
+            logger.warning(
+                "Document deletion started before indexing status was saved; "
+                "cleaning up vectors: document_id=%s",
+                document_id,
+            )
+            cleanup_vectors = True
+        else:
+            logger.exception(
+                "Document indexing completed, but indexed status was rejected: "
+                "document_id=%s",
+                document_id,
+            )
+            return None
+
     except Exception:
         logger.exception(
             "Document indexing completed, but indexed status could not be saved: "
             "document_id=%s",
             document_id,
         )
+        return None
+
+    if cleanup_vectors:
+        try:
+            get_chroma_service().delete_document(
+                owner_id=owner_id,
+                document_id=document_id,
+            )
+        except Exception:
+            logger.exception(
+                "Could not clean up vectors after indexing lifecycle conflict: "
+                "document_id=%s",
+                document_id,
+            )
         return None
 
     return chunk_count

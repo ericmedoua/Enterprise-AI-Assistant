@@ -167,7 +167,7 @@ def test_indexing_worker_does_not_clean_up_vectors_if_indexed_status_fails(
     chroma_service.delete_document.assert_not_called()
 
 
-def test_indexing_worker_does_not_clean_up_vectors_when_deletion_is_in_progress(
+def test_indexing_worker_cleans_up_vectors_when_deletion_is_in_progress(
     monkeypatch,
 ):
     indexing_service, repository = configure_worker_mocks(
@@ -201,4 +201,42 @@ def test_indexing_worker_does_not_clean_up_vectors_when_deletion_is_in_progress(
         chunk_count=5,
     )
 
-    chroma_service.delete_document.assert_not_called()
+    chroma_service.delete_document.assert_called_once_with(
+        owner_id=101,
+        document_id="document-deleting",
+    )
+
+
+def test_indexing_worker_cleans_up_vectors_if_document_no_longer_exists(
+    monkeypatch,
+):
+    indexing_service, repository = configure_worker_mocks(
+        monkeypatch,
+        chunk_count=5,
+    )
+    repository.update_status.return_value = None
+
+    chroma_service = MagicMock()
+    monkeypatch.setattr(
+        documents,
+        "get_chroma_service",
+        lambda: chroma_service,
+    )
+
+    result = documents._index_document_to_chroma(
+        "storage/example.pdf",
+        owner_id=101,
+        document_id="document-missing",
+        source_name="example.pdf",
+    )
+
+    assert result is None
+    repository.update_status.assert_called_once_with(
+        "document-missing",
+        "indexed",
+        chunk_count=5,
+    )
+    chroma_service.delete_document.assert_called_once_with(
+        owner_id=101,
+        document_id="document-missing",
+    )

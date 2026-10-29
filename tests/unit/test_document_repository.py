@@ -94,6 +94,26 @@ def test_invalid_status_transition_is_rejected(db, test_user):
         repository.update_status(document.id, "failed")
 
 
+def test_deleting_document_cannot_return_to_indexed(db, test_user):
+    repository = DocumentRepository(db)
+    document = create_document(repository, test_user.id)
+
+    repository.update_status(document.id, "indexed", chunk_count=3)
+    repository.begin_deletion(document.id, test_user.id)
+
+    with pytest.raises(
+        ValueError,
+        match="Invalid document status transition: deleting -> indexed",
+    ):
+        repository.update_status(document.id, "indexed", chunk_count=3)
+
+    db.expire_all()
+    persisted = repository.get_owned_document(document.id, test_user.id)
+
+    assert persisted is not None
+    assert persisted.status == "deleting"
+
+
 def test_indexed_status_requires_chunk_count(db, test_user):
     repository = DocumentRepository(db)
     document = create_document(repository, test_user.id)

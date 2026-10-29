@@ -44,47 +44,54 @@ def _index_document_to_chroma(
             document_id=document_id,
             source_name=source_name,
         )
-
-        with SessionLocal() as db:
-            DocumentRepository(db).update_status(
-                document_id,
-                "indexed",
-                chunk_count=chunk_count,
-            )
-
-        return chunk_count
-
     except Exception:
         logger.exception(
             "Document indexing failed for document_id=%s",
             document_id,
         )
 
-    try:
-        get_chroma_service().delete_document(
-            owner_id=owner_id,
-            document_id=document_id,
-        )
-    except Exception:
-        logger.exception(
-            "Could not clean up vectors after indexing failure for document_id=%s",
-            document_id,
-        )
+        try:
+            get_chroma_service().delete_document(
+                owner_id=owner_id,
+                document_id=document_id,
+            )
+        except Exception:
+            logger.exception(
+                "Could not clean up vectors after indexing failure for document_id=%s",
+                document_id,
+            )
+
+        try:
+            with SessionLocal() as db:
+                DocumentRepository(db).update_status(
+                    document_id,
+                    "failed",
+                    error_message="Document indexing failed.",
+                )
+        except Exception:
+            logger.exception(
+                "Could not persist failed status for document_id=%s",
+                document_id,
+            )
+
+        return None
 
     try:
         with SessionLocal() as db:
             DocumentRepository(db).update_status(
                 document_id,
-                "failed",
-                error_message="Document indexing failed.",
+                "indexed",
+                chunk_count=chunk_count,
             )
     except Exception:
         logger.exception(
-            "Could not persist failed status for document_id=%s",
+            "Document indexing completed, but indexed status could not be saved: "
+            "document_id=%s",
             document_id,
         )
+        return None
 
-    return None
+    return chunk_count
 
 
 @router.post("/upload")

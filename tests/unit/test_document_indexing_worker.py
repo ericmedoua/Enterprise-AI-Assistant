@@ -133,7 +133,7 @@ def test_indexing_worker_logs_if_failed_status_cannot_be_saved(monkeypatch):
     )
 
 
-def test_indexing_worker_cleans_up_vectors_if_indexed_status_fails(
+def test_indexing_worker_does_not_clean_up_vectors_if_indexed_status_fails(
     monkeypatch,
 ):
     indexing_service, repository = configure_worker_mocks(
@@ -141,10 +141,7 @@ def test_indexing_worker_cleans_up_vectors_if_indexed_status_fails(
         chunk_count=5,
     )
 
-    repository.update_status.side_effect = [
-        RuntimeError("Database unavailable"),
-        None,
-    ]
+    repository.update_status.side_effect = RuntimeError("Database unavailable")
 
     chroma_service = MagicMock()
     monkeypatch.setattr(
@@ -161,36 +158,28 @@ def test_indexing_worker_cleans_up_vectors_if_indexed_status_fails(
     )
 
     assert result is None
-
-    chroma_service.delete_document.assert_called_once_with(
-        owner_id=101,
-        document_id="document-999",
-    )
-
-    assert repository.update_status.call_count == 2
-    repository.update_status.assert_called_with(
+    indexing_service.index_document.assert_called_once()
+    repository.update_status.assert_called_once_with(
         "document-999",
-        "failed",
-        error_message="Document indexing failed.",
+        "indexed",
+        chunk_count=5,
     )
+    chroma_service.delete_document.assert_not_called()
 
 
-def test_indexing_worker_persists_failed_status_if_vector_cleanup_fails(
+def test_indexing_worker_does_not_clean_up_vectors_when_deletion_is_in_progress(
     monkeypatch,
 ):
-    _, repository = configure_worker_mocks(
+    indexing_service, repository = configure_worker_mocks(
         monkeypatch,
         chunk_count=5,
     )
 
-    repository.update_status.side_effect = [
-        RuntimeError("Database unavailable"),
-        None,
-    ]
+    repository.update_status.side_effect = ValueError(
+        "Invalid document status transition: deleting -> indexed"
+    )
 
     chroma_service = MagicMock()
-    chroma_service.delete_document.side_effect = RuntimeError("Chroma unavailable")
-
     monkeypatch.setattr(
         documents,
         "get_chroma_service",
@@ -200,20 +189,16 @@ def test_indexing_worker_persists_failed_status_if_vector_cleanup_fails(
     result = documents._index_document_to_chroma(
         "storage/example.pdf",
         owner_id=101,
-        document_id="document-1000",
+        document_id="document-deleting",
         source_name="example.pdf",
     )
 
     assert result is None
 
-    chroma_service.delete_document.assert_called_once_with(
-        owner_id=101,
-        document_id="document-1000",
+    repository.update_status.assert_called_once_with(
+        "document-deleting",
+        "indexed",
+        chunk_count=5,
     )
 
-    assert repository.update_status.call_count == 2
-    repository.update_status.assert_called_with(
-        "document-1000",
-        "failed",
-        error_message="Document indexing failed.",
-    )
+    chroma_service.delete_document.assert_not_called()

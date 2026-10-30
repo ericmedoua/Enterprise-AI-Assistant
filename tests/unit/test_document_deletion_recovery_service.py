@@ -105,6 +105,84 @@ def test_recovery_keeps_record_when_chroma_fails(
     repository.delete_owned_document.assert_not_called()
 
 
+def test_recovery_keeps_record_when_file_deletion_fails(
+    recovery_setup,
+    monkeypatch,
+):
+    service, _, repository, chroma, storage = recovery_setup
+    document = SimpleNamespace(
+        id="doc-file-error",
+        owner_id=303,
+        stored_filename="doc-file-error_report.pdf",
+    )
+    repository.list_pending_deletions.return_value = [document]
+    repository.claim_pending_deletion.return_value = document
+
+    monkeypatch.setattr(
+        "app.documents.services.deletion_recovery_service.DocumentRepository",
+        lambda db: repository,
+    )
+
+    file_path = storage / document.stored_filename
+    file_path.write_text("test document", encoding="utf-8")
+
+    # Simulate an operating-system error while removing this file.
+    from pathlib import Path
+
+    original_unlink = Path.unlink
+
+    def failing_unlink(path, *args, **kwargs):
+        if path == file_path:
+            raise OSError("Permission denied")
+        return original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", failing_unlink)
+
+    assert service.recover_pending_deletions() == 0
+
+    chroma.delete_document.assert_called_once_with(
+        owner_id=303,
+        document_id="doc-file-error",
+    )
+    assert file_path.exists()
+    repository.delete_owned_document.assert_not_called()
+
+
+def test_recovery_keeps_record_when_registry_deletion_fails(
+    recovery_setup,
+    monkeypatch,
+):
+    service, _, repository, chroma, storage = recovery_setup
+    document = SimpleNamespace(
+        id="doc-db-error",
+        owner_id=404,
+        stored_filename="doc-db-error_report.pdf",
+    )
+    repository.list_pending_deletions.return_value = [document]
+    repository.claim_pending_deletion.return_value = document
+    repository.delete_owned_document.side_effect = RuntimeError("Database unavailable")
+
+    monkeypatch.setattr(
+        "app.documents.services.deletion_recovery_service.DocumentRepository",
+        lambda db: repository,
+    )
+
+    file_path = storage / document.stored_filename
+    file_path.write_text("test document", encoding="utf-8")
+
+    assert service.recover_pending_deletions() == 0
+
+    chroma.delete_document.assert_called_once_with(
+        owner_id=404,
+        document_id="doc-db-error",
+    )
+    assert not file_path.exists()
+    repository.delete_owned_document.assert_called_once_with(
+        "doc-db-error",
+        404,
+    )
+
+
 def test_recovery_continues_after_one_document_fails(
     recovery_setup,
     monkeypatch,

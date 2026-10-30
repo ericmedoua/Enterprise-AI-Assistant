@@ -73,3 +73,83 @@ async def test_shutdown_cancels_scheduler_tasks(monkeypatch):
     await shutdown()
 
     task.cancel.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_scheduler_continues_after_recovery_exception(monkeypatch):
+    from app.documents.services import deletion_recovery_scheduler
+
+    recovery_service = MagicMock()
+    recovery_service.recover_pending_deletions.side_effect = [
+        RuntimeError("Temporary database failure"),
+        1,
+    ]
+
+    monkeypatch.setattr(
+        deletion_recovery_scheduler,
+        "DocumentDeletionRecoveryService",
+        MagicMock(return_value=recovery_service),
+    )
+
+    sleep_calls = []
+
+    async def fake_sleep(interval):
+        sleep_calls.append(interval)
+
+        # Stop after the second recovery cycle.
+        if len(sleep_calls) == 2:
+            raise asyncio.CancelledError
+
+    monkeypatch.setattr(
+        deletion_recovery_scheduler.asyncio,
+        "sleep",
+        fake_sleep,
+    )
+
+    with pytest.raises(asyncio.CancelledError):
+        await deletion_recovery_scheduler.run_document_deletion_recovery_scheduler(
+            interval_seconds=10,
+        )
+
+    assert recovery_service.recover_pending_deletions.call_count == 2
+    assert sleep_calls == [10, 10]
+
+
+@pytest.mark.asyncio
+async def test_scheduler_propagates_cancellation_during_sleep(monkeypatch):
+    from app.documents.services import deletion_recovery_scheduler
+
+    recovery_service = MagicMock()
+    recovery_service.recover_pending_deletions.return_value = 0
+
+    monkeypatch.setattr(
+        deletion_recovery_scheduler,
+        "DocumentDeletionRecoveryService",
+        MagicMock(return_value=recovery_service),
+    )
+
+    sleep_started = asyncio.Event()
+
+    async def blocking_sleep(interval):
+        sleep_started.set()
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(
+        deletion_recovery_scheduler.asyncio,
+        "sleep",
+        blocking_sleep,
+    )
+
+    task = asyncio.create_task(
+        deletion_recovery_scheduler.run_document_deletion_recovery_scheduler(
+            interval_seconds=10,
+        )
+    )
+
+    await sleep_started.wait()
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    recovery_service.recover_pending_deletions.assert_called_once()

@@ -1,8 +1,14 @@
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from app.repositories.document_repository import DocumentRepository
+from app.repositories.document_repository import (
+    DELETION_RETRY_DELAYS_MINUTES,
+    DocumentRepository,
+    get_deletion_retry_delay,
+)
+from app.models.document import Document
 
 
 def create_document(repository, owner_id, filename="report.pdf"):
@@ -270,3 +276,121 @@ def test_list_pending_deletions_returns_empty_list_when_none_pending(
     documents = repository.list_pending_deletions()
 
     assert document.id not in {item.id for item in documents}
+
+
+def test_new_document_starts_with_zero_deletion_attempts(db, test_user):
+    repository = DocumentRepository(db)
+
+    document = create_document(repository, test_user.id)
+
+    assert document.deletion_attempts == 0
+    assert document.deletion_next_retry_at is None
+
+
+@pytest.mark.parametrize(
+    ("attempt", "expected_minutes"),
+    [
+        (1, 1),
+        (2, 2),
+        (3, 4),
+        (4, 8),
+        (5, 15),
+        (6, 15),
+        (10, 15),
+    ],
+)
+def test_deletion_retry_delay_uses_capped_exponential_backoff(
+    attempt,
+    expected_minutes,
+):
+    delay = get_deletion_retry_delay(attempt)
+
+    assert delay == timedelta(minutes=expected_minutes)
+
+
+def test_deletion_retry_delay_rejects_invalid_attempt():
+    with pytest.raises(ValueError, match="attempt must be greater than or equal to 1"):
+        get_deletion_retry_delay(0)
+
+
+def test_record_deletion_failure_increments_attempt_and_schedules_retry(
+    db,
+    test_user,
+):
+    repository = DocumentRepository(db)
+    document = create_document(repository, test_user.id)
+    repository.update_status(document.id, "failed")
+    repository.begin_deletion(document.id, test_user.id)
+
+    before = datetime.now(timezone.utc)
+    retry_at = repository.record_deletion_failure(document.id)
+    after = datetime.now(timezone.utc)
+
+    db.refresh(document)
+
+    assert document.deletion_attempts == 1
+    assert retry_at is not None
+    assert before + timedelta(minutes=1) <= retry_at
+    assert retry_at <= after + timedelta(minutes=1)
+    assert document.deletion_next_retry_at == retry_at
+
+
+def test_record_deletion_failure_ignores_missing_or_non_deleting_document(
+    db,
+    test_user,
+):
+    repository = DocumentRepository(db)
+    document = create_document(repository, test_user.id)
+
+    assert repository.record_deletion_failure(document.id) is None
+
+    db.refresh(document)
+    assert document.deletion_attempts == 0
+    assert document.deletion_next_retry_at is None
+
+    assert repository.record_deletion_failure("missing-document-id") is None
+
+
+def test_list_pending_deletions_excludes_documents_with_future_retry(
+    db,
+    test_user,
+):
+    repository = DocumentRepository(db)
+
+    first = create_document(repository, test_user.id, "first.pdf")
+    second = create_document(repository, test_user.id, "second.pdf")
+
+    for document in (first, second):
+        repository.update_status(document.id, "failed")
+        repository.begin_deletion(document.id, test_user.id)
+
+    retry_at = datetime.now(timezone.utc) + timedelta(minutes=5)
+    second.deletion_attempts = 1
+    second.deletion_next_retry_at = retry_at
+    db.commit()
+
+    pending_ids = {
+        document.id for document in repository.list_pending_deletions(limit=10_000)
+    }
+
+    assert first.id in pending_ids
+    assert second.id not in pending_ids
+
+
+def test_list_pending_deletions_includes_document_when_retry_is_due(
+    db,
+    test_user,
+):
+    repository = DocumentRepository(db)
+    document = create_document(repository, test_user.id)
+
+    repository.update_status(document.id, "failed")
+    repository.begin_deletion(document.id, test_user.id)
+
+    document.deletion_attempts = 1
+    document.deletion_next_retry_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+    db.commit()
+
+    pending_ids = {item.id for item in repository.list_pending_deletions(limit=10_000)}
+
+    assert document.id in pending_ids

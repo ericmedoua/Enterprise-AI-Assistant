@@ -1,3 +1,6 @@
+from datetime import datetime, timedelta, timezone
+
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models.document import Document
@@ -11,6 +14,21 @@ ALLOWED_STATUS_TRANSITIONS = {
     "failed": {"deleting"},
     "deleting": set(),
 }
+
+DELETION_RETRY_DELAYS_MINUTES = (1, 2, 4, 8, 15)
+
+
+def get_deletion_retry_delay(attempt: int) -> timedelta:
+    """Return the capped exponential backoff for a deletion attempt."""
+    if attempt < 1:
+        raise ValueError("attempt must be greater than or equal to 1.")
+
+    delay_index = min(
+        attempt - 1,
+        len(DELETION_RETRY_DELAYS_MINUTES) - 1,
+    )
+
+    return timedelta(minutes=DELETION_RETRY_DELAYS_MINUTES[delay_index])
 
 
 class DocumentRepository:
@@ -204,14 +222,52 @@ class DocumentRepository:
         return True
 
     def list_pending_deletions(self, limit: int = 100) -> list[Document]:
-        """Return documents whose deletion needs to be retried."""
+        """Return deleting documents whose retry time has arrived."""
         if limit < 1:
             raise ValueError("limit must be greater than or equal to 1.")
 
+        now = datetime.now(timezone.utc)
+
         return (
             self.db.query(Document)
-            .filter(Document.status == "deleting")
+            .filter(
+                Document.status == "deleting",
+                or_(
+                    Document.deletion_next_retry_at.is_(None),
+                    Document.deletion_next_retry_at <= now,
+                ),
+            )
             .order_by(Document.created_at.asc(), Document.id.asc())
             .limit(limit)
             .all()
         )
+
+    def record_deletion_failure(self, document_id: str) -> datetime | None:
+        """Record a failed cleanup and schedule its next retry."""
+        try:
+            document = (
+                self.db.query(Document)
+                .filter(
+                    Document.id == document_id,
+                    Document.status == "deleting",
+                )
+                .with_for_update()
+                .first()
+            )
+
+            if document is None:
+                self.db.rollback()
+                return None
+
+            document.deletion_attempts += 1
+            retry_at = datetime.now(timezone.utc) + get_deletion_retry_delay(
+                document.deletion_attempts
+            )
+            document.deletion_next_retry_at = retry_at
+
+            self.db.commit()
+            return retry_at
+
+        except Exception:
+            self.db.rollback()
+            raise

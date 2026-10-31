@@ -41,8 +41,10 @@ class DocumentDeletionRecoveryService:
         completed = 0
 
         for document_id in pending_ids:
+            failure: Exception | None = None
+
             try:
-                # Claim one document and keep this session open throughout cleanup.
+                # Claim one document and keep this session open during cleanup.
                 with self.session_factory() as db:
                     repository = DocumentRepository(db)
                     document = repository.claim_pending_deletion(document_id)
@@ -89,12 +91,22 @@ class DocumentDeletionRecoveryService:
                             document_id,
                         )
 
-            except Exception:
-                # Closing the session releases its lock; the committed deleting
-                # status remains available for another recovery attempt.
+            except Exception as exc:
+                failure = exc
                 logger.exception(
                     "Document deletion recovery failed: document_id=%s",
                     document_id,
                 )
+
+            # The cleanup session has now closed and released its row lock.
+            if failure is not None:
+                try:
+                    with self.session_factory() as db:
+                        DocumentRepository(db).record_deletion_failure(document_id)
+                except Exception:
+                    logger.exception(
+                        "Could not schedule document deletion retry: document_id=%s",
+                        document_id,
+                    )
 
         return completed

@@ -18,6 +18,19 @@ ALLOWED_STATUS_TRANSITIONS = {
 DELETION_RETRY_DELAYS_MINUTES = (1, 2, 4, 8, 15)
 
 
+class InvalidDocumentStatusTransition(ValueError):
+    """Raised when a document status transition is not allowed."""
+
+    def __init__(self, current_status: str, requested_status: str):
+        self.current_status = current_status
+        self.requested_status = requested_status
+
+        super().__init__(
+            f"Invalid document status transition: "
+            f"{current_status} -> {requested_status}"
+        )
+
+
 def get_deletion_retry_delay(attempt: int) -> timedelta:
     """Return the capped exponential backoff for a deletion attempt."""
     if attempt < 1:
@@ -109,8 +122,9 @@ class DocumentRepository:
         if status != document.status:
             allowed = ALLOWED_STATUS_TRANSITIONS[document.status]
             if status not in allowed:
-                raise ValueError(
-                    f"Invalid document status transition: {document.status} -> {status}"
+                raise InvalidDocumentStatusTransition(
+                    current_status=document.status,
+                    requested_status=status,
                 )
 
         if status == "indexed" and chunk_count is None:

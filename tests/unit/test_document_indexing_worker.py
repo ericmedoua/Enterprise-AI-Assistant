@@ -2,6 +2,8 @@ from unittest.mock import MagicMock
 
 from app.api import documents
 
+from app.repositories.document_repository import InvalidDocumentStatusTransition
+
 
 def configure_worker_mocks(monkeypatch, *, chunk_count=None, index_error=None):
     indexing_service = MagicMock()
@@ -175,8 +177,8 @@ def test_indexing_worker_cleans_up_vectors_when_deletion_is_in_progress(
         chunk_count=5,
     )
 
-    repository.update_status.side_effect = ValueError(
-        "Invalid document status transition: deleting -> indexed"
+    repository.update_status.side_effect = InvalidDocumentStatusTransition(
+        current_status="deleting", requested_status="indexed"
     )
 
     chroma_service = MagicMock()
@@ -240,3 +242,38 @@ def test_indexing_worker_cleans_up_vectors_if_document_no_longer_exists(
         owner_id=101,
         document_id="document-missing",
     )
+
+
+def test_indexing_worker_does_not_clean_up_vectors_for_unrelated_value_error(
+    monkeypatch,
+):
+    indexing_service, repository = configure_worker_mocks(
+        monkeypatch,
+        chunk_count=5,
+    )
+
+    repository.update_status.side_effect = ValueError(
+        "Unexpected repository validation error"
+    )
+
+    chroma_service = MagicMock()
+    monkeypatch.setattr(
+        documents,
+        "get_chroma_service",
+        lambda: chroma_service,
+    )
+
+    result = documents._index_document_to_chroma(
+        "storage/example.pdf",
+        owner_id=101,
+        document_id="document-value-error",
+        source_name="example.pdf",
+    )
+
+    assert result is None
+    repository.update_status.assert_called_once_with(
+        "document-value-error",
+        "indexed",
+        chunk_count=5,
+    )
+    chroma_service.delete_document.assert_not_called()

@@ -3,20 +3,28 @@ import shutil
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, UploadFile
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    UploadFile,
+)
 from sqlalchemy.orm import Session
 
+from app.ai.retrieval.dependencies import get_chroma_service
 from app.auth.dependencies import get_current_user
 from app.database.session import SessionLocal, get_db
 from app.documents.services.file_utils import sanitize_filename
 from app.documents.services.file_validator import FileValidator
 from app.documents.services.indexing_service import IndexingService
 from app.models.user import User
-from app.repositories.document_repository import DocumentRepository
+from app.repositories.document_repository import (
+    DocumentRepository,
+    InvalidDocumentStatusTransition,
+)
 from app.repositories.dependencies import get_document_repository
 from app.schemas.document import DocumentResponse
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile
-from app.ai.retrieval.dependencies import get_chroma_service
 
 logger = logging.getLogger(__name__)
 
@@ -94,8 +102,8 @@ def _index_document_to_chroma(
             else:
                 cleanup_vectors = False
 
-    except ValueError as exc:
-        if "Invalid document status transition: deleting -> indexed" in str(exc):
+    except InvalidDocumentStatusTransition as exc:
+        if exc.current_status == "deleting" and exc.requested_status == "indexed":
             logger.warning(
                 "Document deletion started before indexing status was saved; "
                 "cleaning up vectors: document_id=%s",
@@ -109,6 +117,14 @@ def _index_document_to_chroma(
                 document_id,
             )
             return None
+
+    except ValueError:
+        logger.exception(
+            "Document indexing completed, but indexed status was rejected: "
+            "document_id=%s",
+            document_id,
+        )
+        return None
 
     except Exception:
         logger.exception(

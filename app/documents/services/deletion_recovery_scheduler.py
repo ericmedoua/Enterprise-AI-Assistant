@@ -17,14 +17,24 @@ async def run_document_deletion_recovery_scheduler(
 
     while True:
         try:
-            completed = await asyncio.to_thread(
+            result = await asyncio.to_thread(
                 DocumentDeletionRecoveryService().recover_pending_deletions
             )
-            if completed:
+
+            if result.discovered:
                 logger.info(
-                    "Document deletion recovery completed %s document(s).",
-                    completed,
+                    "Document deletion recovery cycle: "
+                    "discovered=%s completed=%s skipped=%s "
+                    "cleanup_failed=%s retry_scheduled=%s "
+                    "retry_schedule_failed=%s",
+                    result.discovered,
+                    result.completed,
+                    result.skipped,
+                    result.cleanup_failed,
+                    result.retry_scheduled,
+                    result.retry_schedule_failed,
                 )
+
         except asyncio.CancelledError:
             raise
         except Exception:

@@ -9,6 +9,7 @@ from app.api.debug import router as debug_router
 from app.api.evaluations import (
     router as evaluations_router,
 )
+from app.api.admin import router as admin_router
 
 router = APIRouter()
 
@@ -39,3 +40,5 @@ router.include_router(
 router.include_router(
     evaluations_router,
 )
+
+router.include_router(admin_router)

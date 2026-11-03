@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from app.documents.services.deletion_recovery_service import (
+    DeletionRecoveryResult,
     DocumentDeletionRecoveryService,
 )
 
@@ -42,7 +43,7 @@ def test_recovery_returns_zero_when_no_documents_are_pending(
         lambda db: repository,
     )
 
-    assert service.recover_pending_deletions() == 0
+    assert service.recover_pending_deletions() == DeletionRecoveryResult()
     chroma.delete_document.assert_not_called()
 
 
@@ -66,7 +67,7 @@ def test_recovery_removes_vectors_file_and_record(
     file_path = storage / document.stored_filename
     file_path.write_text("test document", encoding="utf-8")
 
-    assert service.recover_pending_deletions() == 1
+    assert service.recover_pending_deletions().completed == 1
 
     chroma.delete_document.assert_called_once_with(
         owner_id=101,
@@ -99,7 +100,14 @@ def test_recovery_keeps_record_when_chroma_fails(
     file_path = storage / document.stored_filename
     file_path.write_text("test document", encoding="utf-8")
 
-    assert service.recover_pending_deletions() == 0
+    result = service.recover_pending_deletions()
+
+    assert result.discovered == 1
+    assert result.completed == 0
+    assert result.skipped == 0
+    assert result.cleanup_failed == 1
+    assert result.retry_scheduled == 1
+    assert result.retry_schedule_failed == 0
 
     assert file_path.exists()
     repository.delete_owned_document.assert_not_called()
@@ -138,7 +146,7 @@ def test_recovery_keeps_record_when_file_deletion_fails(
 
     monkeypatch.setattr(Path, "unlink", failing_unlink)
 
-    assert service.recover_pending_deletions() == 0
+    assert service.recover_pending_deletions().cleanup_failed == 1
 
     chroma.delete_document.assert_called_once_with(
         owner_id=303,
@@ -170,7 +178,7 @@ def test_recovery_keeps_record_when_registry_deletion_fails(
     file_path = storage / document.stored_filename
     file_path.write_text("test document", encoding="utf-8")
 
-    assert service.recover_pending_deletions() == 0
+    assert service.recover_pending_deletions().retry_scheduled == 1
 
     chroma.delete_document.assert_called_once_with(
         owner_id=404,
@@ -208,7 +216,14 @@ def test_recovery_continues_after_one_document_fails(
     file_path = storage / second.stored_filename
     file_path.write_text("test document", encoding="utf-8")
 
-    assert service.recover_pending_deletions() == 1
+    result = service.recover_pending_deletions()
+
+    assert result.discovered == 2
+    assert result.completed == 1
+    assert result.skipped == 0
+    assert result.cleanup_failed == 1
+    assert result.retry_scheduled == 1
+    assert result.retry_schedule_failed == 0
 
     chroma.delete_document.assert_called_once_with(
         owner_id=202,
@@ -246,9 +261,53 @@ def test_recovery_skips_document_claimed_by_another_worker(
     file_path = storage / document.stored_filename
     file_path.write_text("test document", encoding="utf-8")
 
-    assert service.recover_pending_deletions() == 0
+    assert service.recover_pending_deletions().skipped == 1
 
     repository.claim_pending_deletion.assert_called_once_with("doc-locked")
     chroma.delete_document.assert_not_called()
     repository.delete_owned_document.assert_not_called()
     assert file_path.exists()
+
+
+def test_recovery_reports_retry_scheduling_failure(
+    recovery_setup,
+    monkeypatch,
+):
+    service, session_factory, repository, chroma, _ = recovery_setup
+
+    document = SimpleNamespace(
+        id="doc-retry-error",
+        owner_id=505,
+        stored_filename="doc-retry-error.pdf",
+    )
+
+    repository.list_pending_deletions.return_value = [document]
+    repository.claim_pending_deletion.return_value = document
+
+    # Fail during the cleanup operation.
+    chroma.delete_document.side_effect = RuntimeError("Chroma unavailable")
+
+    repository_class = lambda db: repository
+    monkeypatch.setattr(
+        "app.documents.services.deletion_recovery_service.DocumentRepository",
+        repository_class,
+    )
+
+    # The first session is for discovery, the second for cleanup,
+    # and the third for retry scheduling.
+    session_factory.side_effect = [
+        session_factory.return_value,
+        session_factory.return_value,
+        session_factory.return_value,
+    ]
+
+    repository.record_deletion_failure.side_effect = RuntimeError(
+        "Database unavailable"
+    )
+
+    result = service.recover_pending_deletions()
+
+    assert result.discovered == 1
+    assert result.cleanup_failed == 1
+    assert result.retry_scheduled == 0
+    assert result.retry_schedule_failed == 1

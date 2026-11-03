@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 
 from app.ai.retrieval.dependencies import get_chroma_service
@@ -6,6 +7,18 @@ from app.database.session import SessionLocal
 from app.repositories.document_repository import DocumentRepository
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class DeletionRecoveryResult:
+    """Outcome counts for one document deletion recovery cycle."""
+
+    discovered: int = 0
+    completed: int = 0
+    skipped: int = 0
+    cleanup_failed: int = 0
+    retry_scheduled: int = 0
+    retry_schedule_failed: int = 0
 
 
 class DocumentDeletionRecoveryService:
@@ -27,8 +40,8 @@ class DocumentDeletionRecoveryService:
         self.upload_directory = upload_directory or Path("storage")
         self.batch_size = batch_size
 
-    def recover_pending_deletions(self) -> int:
-        """Clean up pending documents and return the number completed."""
+    def recover_pending_deletions(self) -> DeletionRecoveryResult:
+        """Clean up pending documents and report this cycle's outcomes."""
         # Read candidate IDs only. This query does not claim the documents.
         with self.session_factory() as db:
             pending_ids = [
@@ -39,9 +52,13 @@ class DocumentDeletionRecoveryService:
             ]
 
         completed = 0
+        skipped = 0
+        cleanup_failed = 0
+        retry_scheduled = 0
+        retry_schedule_failed = 0
 
         for document_id in pending_ids:
-            failure: Exception | None = None
+            failure = False
 
             try:
                 # Claim one document and keep this session open during cleanup.
@@ -51,6 +68,7 @@ class DocumentDeletionRecoveryService:
 
                     # Another worker may hold the lock, or the record may be gone.
                     if document is None:
+                        skipped += 1
                         continue
 
                     owner_id = document.owner_id
@@ -85,28 +103,39 @@ class DocumentDeletionRecoveryService:
                     if deleted:
                         completed += 1
                     else:
+                        skipped += 1
                         logger.info(
                             "Document record was already removed during recovery: "
                             "document_id=%s",
                             document_id,
                         )
 
-            except Exception as exc:
-                failure = exc
+            except Exception:
+                cleanup_failed += 1
+                failure = True
                 logger.exception(
                     "Document deletion recovery failed: document_id=%s",
                     document_id,
                 )
 
             # The cleanup session has now closed and released its row lock.
-            if failure is not None:
+            if failure:
                 try:
                     with self.session_factory() as db:
                         DocumentRepository(db).record_deletion_failure(document_id)
+                    retry_scheduled += 1
                 except Exception:
+                    retry_schedule_failed += 1
                     logger.exception(
                         "Could not schedule document deletion retry: document_id=%s",
                         document_id,
                     )
 
-        return completed
+        return DeletionRecoveryResult(
+            discovered=len(pending_ids),
+            completed=completed,
+            skipped=skipped,
+            cleanup_failed=cleanup_failed,
+            retry_scheduled=retry_scheduled,
+            retry_schedule_failed=retry_schedule_failed,
+        )

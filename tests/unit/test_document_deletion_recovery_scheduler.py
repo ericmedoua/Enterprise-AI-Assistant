@@ -5,6 +5,9 @@ import pytest
 
 from app.core.config import settings
 from app.main import app, startup, shutdown
+from app.documents.services.deletion_recovery_service import (
+    DeletionRecoveryResult,
+)
 
 
 @pytest.mark.asyncio
@@ -82,7 +85,7 @@ async def test_scheduler_continues_after_recovery_exception(monkeypatch):
     recovery_service = MagicMock()
     recovery_service.recover_pending_deletions.side_effect = [
         RuntimeError("Temporary database failure"),
-        1,
+        DeletionRecoveryResult(discovered=1, completed=0, skipped=1),
     ]
 
     monkeypatch.setattr(
@@ -120,7 +123,9 @@ async def test_scheduler_propagates_cancellation_during_sleep(monkeypatch):
     from app.documents.services import deletion_recovery_scheduler
 
     recovery_service = MagicMock()
-    recovery_service.recover_pending_deletions.return_value = 0
+    recovery_service.recover_pending_deletions.return_value = DeletionRecoveryResult(
+        discovered=1, completed=1
+    )
 
     monkeypatch.setattr(
         deletion_recovery_scheduler,

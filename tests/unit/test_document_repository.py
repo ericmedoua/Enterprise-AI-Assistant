@@ -394,3 +394,71 @@ def test_list_pending_deletions_includes_document_when_retry_is_due(
     pending_ids = {item.id for item in repository.list_pending_deletions(limit=10_000)}
 
     assert document.id in pending_ids
+
+
+def test_document_health_metrics_is_stable_without_database_changes(db):
+    repository = DocumentRepository(db)
+
+    before = repository.get_document_health_metrics()
+    after = repository.get_document_health_metrics()
+
+    assert after == before
+
+
+def test_document_health_metrics_counts_lifecycle_and_retry_states(
+    db,
+    test_user,
+):
+    repository = DocumentRepository(db)
+    baseline = repository.get_document_health_metrics()
+
+    indexing = create_document(repository, test_user.id, "indexing.pdf")
+
+    indexed = create_document(repository, test_user.id, "indexed.pdf")
+    repository.update_status(indexed.id, "indexed", chunk_count=5)
+
+    failed = create_document(repository, test_user.id, "failed.pdf")
+    repository.update_status(
+        failed.id,
+        "failed",
+        error_message="Indexing failed.",
+    )
+
+    due_without_schedule = create_document(
+        repository, test_user.id, "due-no-schedule.pdf"
+    )
+    repository.update_status(due_without_schedule.id, "failed")
+    repository.begin_deletion(due_without_schedule.id, test_user.id)
+
+    due_with_past_schedule = create_document(repository, test_user.id, "due-past.pdf")
+    repository.update_status(due_with_past_schedule.id, "failed")
+    repository.begin_deletion(due_with_past_schedule.id, test_user.id)
+    due_with_past_schedule.deletion_attempts = 2
+    due_with_past_schedule.deletion_next_retry_at = datetime.now(
+        timezone.utc
+    ) - timedelta(minutes=1)
+
+    scheduled = create_document(repository, test_user.id, "scheduled.pdf")
+    repository.update_status(scheduled.id, "failed")
+    repository.begin_deletion(scheduled.id, test_user.id)
+    scheduled.deletion_attempts = 3
+    scheduled.deletion_next_retry_at = datetime.now(timezone.utc) + timedelta(minutes=5)
+
+    # A retry timestamp on a non-deleting document must not count.
+    indexed.deletion_attempts = 4
+    indexed.deletion_next_retry_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+
+    db.commit()
+
+    metrics = repository.get_document_health_metrics()
+
+    assert metrics == {
+        "total_documents": baseline["total_documents"] + 6,
+        "indexing_count": baseline["indexing_count"] + 1,
+        "indexed_count": baseline["indexed_count"] + 1,
+        "failed_count": baseline["failed_count"] + 1,
+        "deleting_count": baseline["deleting_count"] + 3,
+        "deletion_due_count": baseline["deletion_due_count"] + 2,
+        "deletion_scheduled_count": (baseline["deletion_scheduled_count"] + 1),
+        "total_deletion_attempts": (baseline["total_deletion_attempts"] + 9),
+    }

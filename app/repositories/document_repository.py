@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.models.document import Document
 
+from sqlalchemy import case, func, or_
+
 
 DOCUMENT_STATUSES = {"indexing", "indexed", "failed", "deleting"}
 
@@ -285,3 +287,61 @@ class DocumentRepository:
         except Exception:
             self.db.rollback()
             raise
+
+    def get_document_health_metrics(self) -> dict[str, int]:
+        """Return aggregate document lifecycle and deletion retry metrics."""
+        now = datetime.now(timezone.utc)
+
+        result = self.db.query(
+            func.count(Document.id).label("total_documents"),
+            func.sum(case((Document.status == "indexing", 1), else_=0)).label(
+                "indexing_count"
+            ),
+            func.sum(case((Document.status == "indexed", 1), else_=0)).label(
+                "indexed_count"
+            ),
+            func.sum(case((Document.status == "failed", 1), else_=0)).label(
+                "failed_count"
+            ),
+            func.sum(case((Document.status == "deleting", 1), else_=0)).label(
+                "deleting_count"
+            ),
+            func.sum(
+                case(
+                    (
+                        (Document.status == "deleting")
+                        & (
+                            (Document.deletion_next_retry_at.is_(None))
+                            | (Document.deletion_next_retry_at <= now)
+                        ),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ).label("deletion_due_count"),
+            func.sum(
+                case(
+                    (
+                        (Document.status == "deleting")
+                        & (Document.deletion_next_retry_at > now),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ).label("deletion_scheduled_count"),
+            func.coalesce(
+                func.sum(Document.deletion_attempts),
+                0,
+            ).label("total_deletion_attempts"),
+        ).one()
+
+        return {
+            "total_documents": result.total_documents or 0,
+            "indexing_count": result.indexing_count or 0,
+            "indexed_count": result.indexed_count or 0,
+            "failed_count": result.failed_count or 0,
+            "deleting_count": result.deleting_count or 0,
+            "deletion_due_count": result.deletion_due_count or 0,
+            "deletion_scheduled_count": (result.deletion_scheduled_count or 0),
+            "total_deletion_attempts": (result.total_deletion_attempts or 0),
+        }
